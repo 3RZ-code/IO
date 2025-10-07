@@ -18,5 +18,9 @@ echo "Creating superuser..."
         --noinput
     echo "Superuser created successfully!"
 
+echo "Importing csv data..."
+python manage.py shell -c "import data_acquisition.utils.import_csv as ic; ic.run()"
+echo "Importing csv finished"
+
 echo "Starting server..."
 python manage.py runserver 0.0.0.0:6543 
