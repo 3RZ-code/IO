@@ -28,4 +28,6 @@ urlpatterns = [
     path('optimization-control/', include('optimization_control.urls')),
     path('alarm-alert/', include('alarm_alert.urls')),
     path('communication/', include('communication.urls')),
+    path('security/', include('security.urls')),
+    path('simulation/', include('simulation.urls')),
 ]
