@@ -11,7 +11,7 @@ def run():
         return 
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    csv_path = os.path.join(base_dir, "static", "sensors_data.csv")
+    csv_path = os.path.join(base_dir, "statics", "sensors_data.csv")
 
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
