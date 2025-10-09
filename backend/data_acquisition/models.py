@@ -1,7 +1,5 @@
 from django.db import models
 
-from django.db import models
-
 class DeviceReading(models.Model):
     timestamp = models.DateTimeField()
     device_id = models.CharField(max_length=50)
