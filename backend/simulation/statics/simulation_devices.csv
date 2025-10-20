@@ -1,0 +1,4 @@
+device_id,type_code,name,status,power_kw,pv_kwp,wind_rated_kw,hp_t_in_set_c,note
+SIM_PV_01,pv,PV Roof A,active,3.2,10,,,demo
+SIM_WIND_01,wind,Wind Turbine B,active,4.5,,20,,
+SIM_HP_01,hp,Heat Pump C,inactive,1.8,,,21,comfort mode
