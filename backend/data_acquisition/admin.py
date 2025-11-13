@@ -15,4 +15,4 @@ class MyModelAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = ("device_type", "location", "metric", "status")
-    search_fifleds = ("device_id", "metric", "location")
+    search_fileds = ("device_id", "metric", "location")
