@@ -12,11 +12,11 @@ python manage.py makemigrations
 python manage.py migrate
 
 echo "Creating superuser..."
-    python manage.py createsuperuser \
-        --email $DJANGO_SUPERUSER_EMAIL \
-        --username $DJANGO_SUPERUSER_USERNAME \
-        --noinput
-    echo "Superuser created successfully!"
+python manage.py createsuperuser \
+    --email $DJANGO_SUPERUSER_EMAIL \
+    --username $DJANGO_SUPERUSER_USERNAME \
+    --noinput 2>/dev/null || echo "Superuser already exists"
+echo "Superuser setup completed"
 
 echo "Importing csv data..."
 python manage.py shell -c "import data_acquisition.utils.import_csv as ic; ic.run()"
