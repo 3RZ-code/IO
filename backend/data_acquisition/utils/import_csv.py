@@ -1,32 +1,84 @@
 import csv
 import os
 from datetime import datetime, timezone as dt_timezone
-from data_acquisition.models import DeviceReading
-
+from data_acquisition.models import Device, DeviceReading
+from django.core.exceptions import ObjectDoesNotExist
 
 def run():
-
-    if DeviceReading.objects.exists():
-        print(" DeviceReading table is not empty, CSV import aborted.")
-        return 
-
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    csv_path = os.path.join(base_dir, "statics", "sensors_data.csv")
-
-    with open(csv_path, newline="", encoding="utf-8") as f:
+    devices_path = os.path.join(base_dir, "statics", "devices.csv")
+    readings_path = os.path.join(base_dir, "statics", "sensors_data.csv")
+    
+    print("Importing devices...")
+    devices_imported = 0
+    devices_updated = 0
+    
+    with open(devices_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            
-            naive_dt = datetime.fromisoformat(row["timestamp"])
-            aware_dt = naive_dt.replace(tzinfo=dt_timezone.utc)
-            DeviceReading.objects.create(
-                timestamp=aware_dt,
+            device, created = Device.objects.get_or_create(
                 device_id=row["device_id"],
-                device_type=row["device_type"],
-                location=row["location"],
-                metric=row["metric"],
-                value=float(row["value"]),
-                unit=row["unit"],
-                signal_dbm=int(row["signal_dbm"]),
-                status=row["status"]
+                defaults={
+                    "name": row["name"],
+                    "device_type": row["device_type"],
+                    "location": row["location"],
+                    "is_active": row["is_active"].lower() == "true",
+                }
             )
+            if created:
+                devices_imported += 1
+            else:
+                devices_updated += 1
+    
+    print(f" Devices imported: {devices_imported}, updated: {devices_updated}")
+
+    print("Importing device readings...")
+    
+    old_count = DeviceReading.objects.count()
+    if old_count > 0:
+        print(f" Usuwanie {old_count} starych rekordów...")
+        DeviceReading.objects.all().delete()
+    
+    imported_count = 0
+    skipped_count = 0
+
+    with open(readings_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            try:
+                device = Device.objects.get(device_id=row["device_id"])
+
+                naive_dt = datetime.fromisoformat(row["timestamp"])
+                aware_dt = naive_dt.replace(tzinfo=dt_timezone.utc)
+                
+                reading_value = float(row["value"])
+                reading_signal_dbm = int(row["signal_dbm"])
+
+                DeviceReading.objects.create(
+                    device=device,
+                    timestamp=aware_dt,
+                    device_type=row["device_type"],
+                    location=row["location"],
+                    metric=row["metric"],
+                    value=reading_value,
+                    unit=row["unit"],
+                    signal_dbm=reading_signal_dbm,
+                    status=row["status"],
+                )
+                imported_count += 1
+            
+            except ObjectDoesNotExist:
+                print(f" Pomięto odczyt: Brak urządzenia o ID: {row['device_id']}. Wiersz: {reader.line_num}.")
+                skipped_count += 1
+                
+            except ValueError as e:
+                print(f" Pomięto odczyt: Błąd konwersji danych w wierszu {reader.line_num}. {e}")
+                skipped_count += 1
+            
+            except Exception as e:
+                print(f" Pomięto odczyt: Nieznany błąd w wierszu {reader.line_num}. {e}")
+                skipped_count += 1
+                
+    print(f" DeviceReadings imported. Utworzono: {imported_count}. Pominięto: {skipped_count}.")
+    print("=== IMPORT COMPLETED ===")

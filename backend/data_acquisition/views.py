@@ -1,6 +1,6 @@
 from rest_framework import generics
-from data_acquisition.models import DeviceReading
-from .utils.serializers import DeviceReadingSerializer
+from data_acquisition.models import DeviceReading, Device
+from .utils.serializers import DeviceReadingSerializer, DeviceSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.utils.dateparse import parse_datetime
@@ -10,6 +10,17 @@ from rest_framework.permissions import AllowAny
 
 def index(request):
     return HttpResponse("Data acquisition module!")
+
+
+class DeviceListCreate(generics.ListCreateAPIView):
+
+    queryset = Device.objects.all()
+    serializer_class = DeviceSerializer
+
+class DeviceDetail(generics.RetrieveUpdateDestroyAPIView):
+
+    queryset = Device.objects.all()
+    serializer_class = DeviceSerializer
 
 class DeviceReadingListCreate(generics.ListCreateAPIView):
     queryset = DeviceReading.objects.all()
@@ -28,9 +39,11 @@ class DeviceReadingFilter(APIView):
         timestamp = request.GET.get("timestamp") 
         start = request.GET.get("start")
         end = request.GET.get("end")
-        readings = DeviceReading.objects.all()
+        readings = DeviceReading.objects.all().select_related('device') 
+        
         if device_id:
-            readings = readings.filter(device_id=device_id)
+            readings = readings.filter(device__device_id=device_id)
+        
         if location:
             readings = readings.filter(location=location)
         if metric:
