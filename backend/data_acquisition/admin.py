@@ -14,5 +14,11 @@ class MyModelAdmin(admin.ModelAdmin):
         "signal_dbm",
         "status",
     )
-    list_filter = ("device_type", "location", "metric", "status")
-    search_fileds = ("device_id", "metric", "location")
+    list_filter = (
+        "device_type", 
+        "location", 
+        "metric", 
+        "status",
+        ("timestamp", admin.DateFieldListFilter)
+        )
+    search_fields = ("device_id", "metric", "location")
