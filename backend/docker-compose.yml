@@ -14,7 +14,14 @@ services:
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
-      - .:/app
+      - ./alarm_alert/migrations:/app/alarm_alert/migrations
+      - ./analysis_reporting/migrations:/app/analysis_reporting/migrations
+      - ./communication/migrations:/app/communication/migrations
+      - ./data_acquisition/migrations:/app/data_acquisition/migrations
+      - ./forecasting/migrations:/app/forecasting/migrations
+      - ./optimization_control/migrations:/app/optimization_control/migrations
+      - ./security/migrations:/app/security/migrations
+      - ./simulation/migrations:/app/simulation/migrations
       - ./media:/app/media
     depends_on:
       db_v17:
