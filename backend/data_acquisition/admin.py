@@ -1,12 +1,19 @@
 from django.contrib import admin
-from .models import DeviceReading
+from .models import DeviceReading, Device 
+
+@admin.register(Device)
+class DeviceAdmin(admin.ModelAdmin):
+    list_display = ("device_id", "name", "device_type", "location", "is_active")
+    list_filter = ("device_type", "location", "is_active")
+    search_fields = ("device_id", "name", "location")
+
 
 @admin.register(DeviceReading)
 class MyModelAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "timestamp",
-        "device_id",
+        "device",  
         "location",
         "metric",
         "value",
@@ -15,10 +22,16 @@ class MyModelAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = (
-        "device_type", 
+        "device__device_type", 
         "location", 
         "metric", 
         "status",
         ("timestamp", admin.DateFieldListFilter)
         )
-    search_fields = ("device_id", "metric", "location")
+    search_fields = (
+        "device__device_id", 
+        "metric", 
+        "location"
+    )
+    
+    list_select_related = ('device',)
