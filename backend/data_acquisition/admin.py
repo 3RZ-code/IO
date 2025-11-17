@@ -3,7 +3,7 @@ from .models import DeviceReading, Device
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ("device_id", "name", "device_type", "location", "is_active")
+    list_display = ("id","device_id", "name", "device_type", "location", "is_active")
     list_filter = ("device_type", "location", "is_active")
     search_fields = ("device_id", "name", "location")
 
@@ -14,6 +14,7 @@ class MyModelAdmin(admin.ModelAdmin):
         "id",
         "timestamp",
         "device",  
+        "device_type",
         "location",
         "metric",
         "value",
