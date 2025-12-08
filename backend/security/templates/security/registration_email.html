@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            line-height: 1.6;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px 8px 0 0;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+            margin-top: 20px;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Witamy w Systemie!</h2>
+        </div>
+        <div class="content">
+            <p>Witaj {{ user.username }},</p>
+            <p>Dziękujemy za rejestrację w naszym systemie. Twoje konto zostało pomyślnie utworzone.</p>
+            <p>Możesz teraz zalogować się i korzystać z dostępnych funkcjonalności.</p>
+            <p>Jeśli masz jakieś pytania, skontaktuj się z naszym zespołem wsparcia.</p>
+            <p>Pozdrawiamy,<br>Zespół IO</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 IO Project. Wszelkie prawa zastrzeżone.</p>
+        </div>
+    </div>
+</body>
+</html>
