@@ -16,6 +16,7 @@ services:
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
       - EMAIL_HOST_USER=${EMAIL_HOST_USER}
       - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - GROQ_API_KEY=${GROQ_API_KEY}
     volumes:
       - ./alarm_alert/migrations:/app/alarm_alert/migrations
       - ./analysis_reporting/migrations:/app/analysis_reporting/migrations
@@ -36,6 +37,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_v17_data:/var/lib/postgresql/data
     healthcheck:

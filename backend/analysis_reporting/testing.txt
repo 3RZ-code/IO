@@ -1,0 +1,31 @@
+TWORZYMY KRYTERIA
+
+curl -X POST http://localhost:6543/analysis-reporting/criteria/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location": "Lab",
+    "device_type": "energy_meter",
+    "date_created_from": "2025-10-01",
+    "date_created_to": "2025-10-02",
+    "report_frequency": "DAILY"
+  }'
+
+  GENERUJEMY RAPORT 
+  
+  curl -X POST http://localhost:6543/analysis-reporting/reports/generate/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "criteria_id": "96d55058-85ce-488a-8b21-0eb4a72c4dce,
+    "generate_charts": true
+  }'
+
+ANOMALIE SPRAWDZENIE
+
+curl -X POST http://localhost:6543/analysis-reporting/reports/96d55058-85ce-488a-8b21-0eb4a72c4dce/generate_anomaly/ \
+  -H "Content-Type: application/json" \
+  -d '{"generate_chart": true}'
+
+EKSPORT DANYCH
+
+curl http://localhost:6543/analysis-reporting/reports/96d55058-85ce-488a-8b21-0eb4a72c4dce/export/ \
+  -o raport_full.json
