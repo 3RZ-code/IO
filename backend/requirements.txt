@@ -3,3 +3,8 @@ psycopg2-binary==2.9.10
 python-dotenv==1.0.0
 djangorestframework
 djangorestframework-simplejwt
+matplotlib>=3.7.0
+seaborn>=0.12.0
+reportlab>=4.0.0
+Pillow>=10.0.0
+requests>=2.31.0
