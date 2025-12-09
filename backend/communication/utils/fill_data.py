@@ -4,7 +4,21 @@ from datetime import datetime
 from django.db import migrations
 
 
+import csv
+import os
+from datetime import datetime
+from django.db import migrations, connection
+from django.core.management.color import no_style
+
+def reset_sequence(model_class):
+    sequence_sql = connection.ops.sequence_reset_sql(no_style(), [model_class])
+    with connection.cursor() as cursor:
+        for sql in sequence_sql:
+            cursor.execute(sql)
+    print(f"Sequence reset for {model_class.__name__}")
+
 def fill_schedules(apps, schema_editor):
+
     Schedule = apps.get_model('communication', 'Schedule')
     User = apps.get_model('auth', 'User')
     
@@ -55,6 +69,12 @@ def fill_schedules(apps, schema_editor):
 def fill_schedules_cli():
     from communication.models import Schedule
     
+    # Always try to reset sequence to ensure consistency
+    try:
+        reset_sequence(Schedule)
+    except Exception as e:
+        print(f"Warning: Could not reset sequence: {e}")
+
     if Schedule.objects.exists():
         print("Schedules table is not empty, skipping.")
         return
@@ -94,6 +114,7 @@ def fill_schedules_cli():
         if schedules_to_create:
             Schedule.objects.bulk_create(schedules_to_create)
             print(f"Loaded {len(schedules_to_create)} schedules from {file_path}")
+            reset_sequence(Schedule)
         else:
             print("No schedules created.")
     except Exception as e:
