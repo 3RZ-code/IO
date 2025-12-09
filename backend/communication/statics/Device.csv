@@ -1,4 +1,0 @@
-device_id,device_name,device_type,zone,activated
-1,Industrial Fan A1,HVAC,Zone 1,1
-2,Water Pump B2,Hydraulic,Zone 2,1
-3,Power Generator C3,Electrical,Zone 3,0

@@ -14,20 +14,10 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Device',
-            fields=[
-                ('device_id', models.AutoField(primary_key=True, serialize=False)),
-                ('device_name', models.TextField()),
-                ('device_type', models.TextField()),
-                ('zone', models.TextField()),
-                ('activated', models.BooleanField(default=False)),
-            ],
-        ),
-        migrations.CreateModel(
             name='Schedule',
             fields=[
                 ('schedule_id', models.AutoField(primary_key=True, serialize=False)),
-                ('device', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='communication.device')),
+                ('device_id', models.IntegerField()),
                 ('user_id', models.TextField()),
                 ('start_date', models.DateField()),
                 ('finish_date', models.DateField()),

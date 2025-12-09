@@ -22,5 +22,9 @@ echo "Importing csv data..."
 python manage.py shell -c "import data_acquisition.utils.import_csv as ic; ic.run()"
 echo "Importing csv finished"
 
+echo "Importing CSV data for Schedule..."
+python manage.py shell -c "from communication.utils.fill_data import fill_schedules_cli; fill_schedules_cli()"
+echo "Schedule import finished."
+
 echo "Starting server..."
 python manage.py runserver 0.0.0.0:6543 
