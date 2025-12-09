@@ -1,5 +1,5 @@
 from .models import Device
-from weather import weather_connection
+from .weather import weather_connection
 
 
 NORMAL_PRIZES = 0.6212
@@ -58,7 +58,6 @@ class temperature_control(weather_connection):
 
 def run_my_code(param):
     opt = optimizationAlgorithm()
-    # opt.setlist()
     results = opt.optimize()
     if not results:
         return "<p>Brak optymalizacji do wyświetlenia.</p>"
