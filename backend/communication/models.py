@@ -10,7 +10,6 @@ class Schedule(models.Model):
     start_date = models.DateField()
     finish_date = models.DateField()
     working_period = models.TimeField()
-    power_consumption = models.FloatField()
     working_status = models.BooleanField(default=False)
 
     def __str__(self):

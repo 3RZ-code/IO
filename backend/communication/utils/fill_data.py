@@ -32,7 +32,6 @@ def fill_schedules(apps, schema_editor):
                 # Handle NULL values for dates and numeric fields
                 finish_date = None if row['finish_date'] == '' else datetime.strptime(row['finish_date'], '%Y-%m-%d').date()
                 working_period = None if row['working_period'] == 'NULL' else datetime.strptime(row['working_period'], '%H:%M:%S').time()
-                power_consumption = None if row['power_consumpted'] == 'NULL' else float(row['power_consumpted'])
 
                 schedule_instance = Schedule(
                     schedule_id=int(row['schedule_id']),
@@ -41,7 +40,6 @@ def fill_schedules(apps, schema_editor):
                     start_date=datetime.strptime(row['start_date'], '%Y-%m-%d').date(),
                     finish_date=finish_date,
                     working_period=working_period,
-                    power_consumption=power_consumption,
                     working_status=bool(int(row['working_status']))
                 )
                 schedules_to_create.append(schedule_instance)
@@ -55,10 +53,6 @@ def fill_schedules(apps, schema_editor):
 
 
 def fill_schedules_cli():
-    """
-    Wrapper callable from manage.py shell to import schedules.
-    Safe to call repeatedly (checks if table is empty).
-    """
     from communication.models import Schedule
     
     if Schedule.objects.exists():
@@ -91,7 +85,6 @@ def fill_schedules_cli():
                         start_date=datetime.strptime(row['start_date'], '%Y-%m-%d').date(),
                         finish_date=finish_date,
                         working_period=working_period,
-                        power_consumption=power_consumption,
                         working_status=bool(int(row.get('working_status', '0')))
                     )
                     schedules_to_create.append(schedule_instance)

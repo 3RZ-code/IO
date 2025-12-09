@@ -6,5 +6,4 @@ from .models import Schedule
 class ScheduleAdmin(admin.ModelAdmin):
     list_display = ('schedule_id', 'device_id', 'user_id', 'start_date', 'finish_date', 'working_period', 'working_status')
     list_filter = ('working_status', 'start_date', 'finish_date')
-    # Szukamy teraz po device_id, a nie po nazwie urządzenia
     search_fields = ('device_id', 'user_id')
