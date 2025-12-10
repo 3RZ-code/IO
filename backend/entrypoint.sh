@@ -22,6 +22,10 @@ echo "Importing csv data..."
 python manage.py shell -c "import data_acquisition.utils.import_csv as ic; ic.run()"
 echo "Importing csv finished"
 
+echo "Importing CSV data for Schedule..."
+python manage.py shell -c "from communication.utils.fill_data import fill_schedules_cli; fill_schedules_cli()"
+echo "Schedule import finished."
+
 echo "Importing CSV data for Alerts..."
 python manage.py shell -c "from alarm_alert.utils.fill_data import fill_alerts_from_csv; fill_alerts_from_csv()" || echo "Alert import failed."
 echo "Alerts import finished."
