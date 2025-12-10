@@ -9,7 +9,7 @@ class weather_connection:
         self.stats = {}
 
     def connect(self):
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={LATITUDE}&longitude={LONGITUDE}&daily=temperature_2m_min"
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={LATITUDE}&longitude={LONGITUDE}&daily=wind_speed_10m_max,shortwave_radiation_sum,temperature_2m_max,temperature_2m_min,temperature_2m_mean&hourly=temperature_2m"
         try:
             with request.urlopen(url) as response:
                 if response.status != 200:
@@ -27,3 +27,16 @@ class weather_connection:
             return daily["time"][1], daily["temperature_2m_min"][1]
         else:
             return "Error", "Error"
+        
+    def return_for_simulation(self):
+        if self.stats.get("error") is None:
+            daily = self.stats["daily"]
+            return {
+                "time": daily["time"],
+                "wind_speed_10m_max": daily["wind_speed_10m_max"],
+                "shortwave_radiation_sum": daily["shortwave_radiation_sum"],
+                "temperature_2m_max": daily["temperature_2m_max"],
+                "temperature_2m_min": daily["temperature_2m_min"],
+                "temperature_2m_mean": daily["temperature_2m_mean"],
+            }
+        
