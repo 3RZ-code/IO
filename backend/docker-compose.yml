@@ -26,6 +26,7 @@ services:
     depends_on:
       db_v17:
         condition: service_healthy
+    entrypoint: "./entrypoint.sh"
 
   db_v17:
     image: postgres:17-alpine

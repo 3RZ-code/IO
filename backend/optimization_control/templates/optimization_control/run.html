@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Wyniki optymalizacji</title>
+</head>
+<body>
+  <h1>Wyniki optymalizacji</h1>
+  {% if result %}
+    <div>{{ result|safe }}</div>
+  {% else %}
+    <p>Brak wyniku.</p>
+  {% endif %}
+</body>
+</html>

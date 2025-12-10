@@ -1,4 +1,6 @@
-from django.http import HttpResponse
+from django.shortcuts import render
+from .utils import run_my_code
 
 def index(request):
-    return HttpResponse("Data acquisition module!")
+    result = run_my_code('')
+    return render(request, 'optimization_control/run.html', {'result': result})
