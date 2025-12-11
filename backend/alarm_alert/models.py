@@ -40,25 +40,21 @@ class Alert(models.Model):
         return f"[{self.severity}] {self.title}"
 
     def createAlert(self):
-        """Tworzy nowy alert"""
         self.save()
         return self
 
     def confirmAlert(self):
-        """Potwierdza alert"""
         self.status = 'CONFIRMED'
         self.save()
         return self
 
     def muteAlert(self):
-        """Wycisza alert"""
         self.is_muted = True
         self.status = 'MUTED'
         self.save()
         return self
 
     def deleteAlert(self):
-        """Usuwa alert"""
         self.delete()
 
 
@@ -82,12 +78,10 @@ class Notification(models.Model):
         return f"Notification for {self.user.username}: {self.message[:50]}"
 
     def sendNotification(self):
-        """Wysyła powiadomienie"""
         self.save()
         return self
 
     def markAsRead(self):
-        """Oznacza powiadomienie jako przeczytane"""
         self.is_read = True
         self.save()
         return self
@@ -108,7 +102,6 @@ class NotificationPreferences(models.Model):
         return f"Preferences for {self.user.username}"
 
     def setQuietHours(self, start_time, end_time):
-        """Ustawia godziny ciszy"""
         self.quiet_hours_start = start_time
         self.quiet_hours_end = end_time
         self.save()

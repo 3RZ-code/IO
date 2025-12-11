@@ -6,7 +6,6 @@ from security.models import User
 
 
 def fill_alerts_from_csv():
-    """Wypełnia bazę danych alertami z pliku CSV"""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     file_path = os.path.join(base_dir, "statics", "alerts_data.csv")
 
@@ -24,7 +23,6 @@ def fill_alerts_from_csv():
         reader = csv.DictReader(csv_file)
         for row in reader:
             try:
-                # Znajdź użytkownika jeśli podany
                 user = None
                 if row.get("user_email"):
                     user = User.objects.filter(email=row["user_email"]).first()
@@ -51,9 +49,7 @@ def fill_alerts_from_csv():
 
 
 def create_sample_data():
-    """Tworzy przykładowe dane dla testów"""
     
-    # Pobierz użytkowników
     admin_user = User.objects.filter(role='admin').first()
     regular_user = User.objects.filter(role='user').first()
     
@@ -61,7 +57,6 @@ def create_sample_data():
         print("Users not found. Please create users first.")
         return
     
-    # Utwórz przykładowe alerty
     alerts_data = [
         {
             'user': admin_user,
@@ -97,7 +92,7 @@ def create_sample_data():
     
     print(f"Created {len(alerts_data)} sample alerts")
     
-    # Utwórz preferencje powiadomień
+
     NotificationPreferences.objects.get_or_create(
         user=admin_user,
         defaults={
@@ -120,7 +115,6 @@ def create_sample_data():
 
 
 def fill_alerts_cli():
-    """Funkcja wywoływana z CLI"""
     print("Importing CSV data for Alerts...")
     fill_alerts_from_csv()
     print("Alerts import finished.")

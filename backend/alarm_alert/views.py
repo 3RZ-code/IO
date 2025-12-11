@@ -10,43 +10,26 @@ from .serializers import AlertSerializer, NotificationSerializer, NotificationPr
 
 
 class AlertViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet dla zarządzania alertami.
-    Obsługuje CRUD oraz dodatkowe akcje: confirm, mute.
-    
-    Uprawnienia:
-    - CRUD (create, update, delete, list): Tylko admin
-    - Akcje (confirm, mute, my_alerts): Zalogowani użytkownicy
-    """
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
     permission_classes = [IsAdmin]  # CRUD tylko dla admina
     
     def get_permissions(self):
-        """
-        Różne uprawnienia dla różnych akcji:
-        - CRUD: tylko admin (IsAdmin)
-        - confirm, mute, my_alerts, statistics: zalogowani użytkownicy (IsAuthenticated)
-        """
-        if self.action in ['confirm', 'mute', 'my_alerts', 'statistics']:
+        if self.action in ['list', 'retrieve', 'confirm', 'mute', 'my_alerts', 'statistics']:
             return [IsAuthenticated()]
         return super().get_permissions()
 
 
     def get_queryset(self):
-        """Filtruje alerty w zależności od roli użytkownika"""
         user = self.request.user
         
-        # Admin widzi wszystkie alerty
         if user.is_authenticated and hasattr(user, 'role') and user.role == 'admin':
             queryset = Alert.objects.all()
-        # Zwykły użytkownik widzi tylko swoje alerty lub alerty bez przypisania
         elif user.is_authenticated:
             queryset = Alert.objects.filter(Q(user=user) | Q(user__isnull=True))
         else:
             queryset = Alert.objects.none()
         
-        # Parametry filtrowania
         severity = self.request.query_params.get('severity')
         status_filter = self.request.query_params.get('status')
         category = self.request.query_params.get('category')
@@ -61,24 +44,26 @@ class AlertViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     def perform_create(self, serializer):
-        """Tworzy alert i powiadomienie dla użytkownika"""
-        alert = serializer.save()
+        if 'user' not in serializer.validated_data or serializer.validated_data.get('user') is None:
+            alert = serializer.save(user=self.request.user)
+        else:
+            alert = serializer.save()
         
-        # Utwórz powiadomienie dla użytkownika
         if alert.user:
             self._create_notification_for_alert(alert)
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
-        """Potwierdza alert"""
         alert = self.get_object()
         alert.confirmAlert()
+        
+        self._send_confirmation_notifications(alert, request.user)
+        
         serializer = self.get_serializer(alert)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def mute(self, request, pk=None):
-        """Wycisza alert"""
         alert = self.get_object()
         alert.muteAlert()
         serializer = self.get_serializer(alert)
@@ -86,7 +71,6 @@ class AlertViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def my_alerts(self, request):
-        """Zwraca alerty zalogowanego użytkownika"""
         if not request.user.is_authenticated:
             return Response({'message': 'No alerts for anonymous users', 'results': []})
         
@@ -96,7 +80,6 @@ class AlertViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def statistics(self, request):
-        """Zwraca statystyki alertów"""
         user = request.user
         if not user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
@@ -120,21 +103,50 @@ class AlertViewSet(viewsets.ModelViewSet):
         }
         return Response(stats)
 
+    def _send_confirmation_notifications(self, alert, confirmed_by):
+        from security.models import User
+        import pytz
+        
+        recipients = set()  
+        
+        if alert.user and alert.user != confirmed_by:
+            recipients.add(alert.user)
+        
+        admins = User.objects.filter(role='admin')
+        for admin in admins:
+            recipients.add(admin)
+        
+        local_tz = pytz.timezone('Europe/Warsaw')
+        current_time = timezone.now().astimezone(local_tz).time()
+        
+        for user in recipients:
+            preferences = NotificationPreferences.objects.filter(user=user).first()
+            
+            if preferences and not preferences.is_active:
+                continue
+            
+            if preferences and preferences.quiet_hours_start and preferences.quiet_hours_end:
+                if preferences.quiet_hours_start <= current_time <= preferences.quiet_hours_end:
+                    continue  
+            
+            Notification.objects.create(
+                user=user,
+                alert=alert,
+                message=f"Alert '{alert.title}' został potwierdzony przez {confirmed_by.username}.",
+                sent_at=timezone.now()
+            )
+
     def _create_notification_for_alert(self, alert):
-        """Pomocnicza metoda do tworzenia powiadomienia"""
-        # Sprawdź preferencje użytkownika
         preferences = NotificationPreferences.objects.filter(user=alert.user).first()
         
         if preferences and not preferences.is_active:
             return
         
-        # Sprawdź godziny ciszy
         if preferences and preferences.quiet_hours_start and preferences.quiet_hours_end:
             current_time = timezone.now().time()
             if preferences.quiet_hours_start <= current_time <= preferences.quiet_hours_end:
                 return
         
-        # Utwórz powiadomienie
         Notification.objects.create(
             user=alert.user,
             alert=alert,
@@ -143,29 +155,18 @@ class AlertViewSet(viewsets.ModelViewSet):
 
 
 class NotificationViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet dla zarządzania powiadomieniami.
-    Obsługuje CRUD oraz akcję mark_as_read.
-    
-    Uprawnienia:
-    - Wszystkie operacje: Tylko zalogowani użytkownicy
-    - Użytkownicy widzą tylko swoje powiadomienia
-    """
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Zwraca tylko powiadomienia zalogowanego użytkownika"""
         user = self.request.user
         
-        # Admin widzi wszystkie powiadomienia, użytkownicy tylko swoje
         if hasattr(user, 'role') and user.role == 'admin':
             queryset = Notification.objects.all()
         else:
             queryset = Notification.objects.filter(user=user)
         
-        # Parametry filtrowania
         is_read = self.request.query_params.get('is_read')
         if is_read is not None:
             queryset = queryset.filter(is_read=is_read.lower() == 'true')
@@ -174,7 +175,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def mark_as_read(self, request, pk=None):
-        """Oznacza powiadomienie jako przeczytane"""
         notification = self.get_object()
         notification.markAsRead()
         serializer = self.get_serializer(notification)
@@ -182,7 +182,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
-        """Oznacza wszystkie powiadomienia użytkownika jako przeczytane"""
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
         
@@ -193,7 +192,6 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
-        """Zwraca liczbę nieprzeczytanych powiadomień"""
         if not request.user.is_authenticated:
             return Response({'unread_count': 0})
         
@@ -202,15 +200,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
 
 
 class NotificationPreferencesViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet dla zarządzania preferencjami powiadomień.
-    """
     queryset = NotificationPreferences.objects.all()
     serializer_class = NotificationPreferencesSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        """Zwraca tylko preferencje zalogowanego użytkownika"""
         user = self.request.user
         if user.role == 'admin':
             return NotificationPreferences.objects.all()
@@ -218,7 +212,6 @@ class NotificationPreferencesViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get', 'post', 'put'])
     def my_preferences(self, request):
-        """Zwraca lub aktualizuje preferencje zalogowanego użytkownika"""
         if not request.user.is_authenticated:
             return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
         
@@ -236,7 +229,7 @@ class NotificationPreferencesViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def set_quiet_hours(self, request, pk=None):
-        """Ustawia godziny ciszy"""
+
         preferences = self.get_object()
         start_time = request.data.get('quiet_hours_start')
         end_time = request.data.get('quiet_hours_end')
