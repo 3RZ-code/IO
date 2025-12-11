@@ -1,58 +1,115 @@
 from django.db import models
+from security.models import User
+import uuid
 
 
 class Alert(models.Model):
-    alarm_id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField(null=True, blank=True)
-    device_id = models.IntegerField(null=True, blank=True)
-
-    timestamp = models.DateTimeField(auto_now_add=True)
+    SEVERITY_CHOICES = [
+        ('CRITICAL', 'Critical'),
+        ('WARNING', 'Warning'),
+        ('INFO', 'Info'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('NEW', 'New'),
+        ('CONFIRMED', 'Confirmed'),
+        ('MUTED', 'Muted'),
+        ('CLOSED', 'Closed'),
+    ]
+    
+    alert_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='alerts')
+    
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='INFO')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='NEW')
+    category = models.CharField(max_length=100)
     source = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_muted = models.BooleanField(default=False)
 
-    category = models.CharField(
-        max_length=30,
-        choices=[
-            ('system', 'System'),
-            ('energy', 'Energia'),
-            ('weather', 'Pogoda'),
-            ('report', 'Raport'),
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+            models.Index(fields=['severity', 'created_at']),
         ]
-    )
-    severity = models.CharField(
-        max_length=20,
-        choices=[
-            ('info', 'Informacyjny'),
-            ('warning', 'Ostrzeżenie'),
-            ('critical', 'Krytyczny'),
-        ]
-    )
-
-    message = models.TextField()
-    details = models.TextField(blank=True, null=True)
-
-    status = models.CharField(
-        max_length=20,
-        choices=[
-            ('open', 'Otwarty'),
-            ('acknowledged', 'Potwierdzony'),
-            ('resolved', 'Zamknięty'),
-        ],
-        default='open'
-    )
-
-    is_quiet_hours = models.BooleanField(default=False)
-    notified = models.BooleanField(default=False)
-    deleted = models.BooleanField(default=False)
-
-    visible_for = models.CharField(
-        max_length=10,
-        choices=[
-            ('admin', 'Admin'),
-            ('user', 'User'),
-            ('both', 'Obaj'),
-        ],
-        default='both'
-    )
 
     def __str__(self):
-        return f"[{self.severity.upper()}] {self.message[:50]}"
+        return f"[{self.severity}] {self.title}"
+
+    def createAlert(self):
+        """Tworzy nowy alert"""
+        self.save()
+        return self
+
+    def confirmAlert(self):
+        """Potwierdza alert"""
+        self.status = 'CONFIRMED'
+        self.save()
+        return self
+
+    def muteAlert(self):
+        """Wycisza alert"""
+        self.is_muted = True
+        self.status = 'MUTED'
+        self.save()
+        return self
+
+    def deleteAlert(self):
+        """Usuwa alert"""
+        self.delete()
+
+
+class Notification(models.Model):
+    notification_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    alert = models.ForeignKey(Alert, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
+    
+    message = models.TextField()
+    sent_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-sent_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['sent_at']),
+        ]
+
+    def __str__(self):
+        return f"Notification for {self.user.username}: {self.message[:50]}"
+
+    def sendNotification(self):
+        """Wysyła powiadomienie"""
+        self.save()
+        return self
+
+    def markAsRead(self):
+        """Oznacza powiadomienie jako przeczytane"""
+        self.is_read = True
+        self.save()
+        return self
+
+
+class NotificationPreferences(models.Model):
+    preference_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_preferences')
+    
+    quiet_hours_start = models.TimeField(null=True, blank=True)
+    quiet_hours_end = models.TimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "Notification Preferences"
+
+    def __str__(self):
+        return f"Preferences for {self.user.username}"
+
+    def setQuietHours(self, start_time, end_time):
+        """Ustawia godziny ciszy"""
+        self.quiet_hours_start = start_time
+        self.quiet_hours_end = end_time
+        self.save()
+        return self
