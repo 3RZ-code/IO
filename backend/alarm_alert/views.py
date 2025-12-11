@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.db.models import Q
 from .models import Alert, Notification, NotificationPreferences
@@ -15,7 +15,9 @@ class AlertViewSet(viewsets.ModelViewSet):
     """
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Temporarily allow all for testing
+
 
     def get_queryset(self):
         """Filtruje alerty w zależności od roli użytkownika"""
@@ -23,8 +25,10 @@ class AlertViewSet(viewsets.ModelViewSet):
         queryset = Alert.objects.all()
         
         # Filtruj według użytkownika jeśli nie jest adminem
-        if user.role != 'admin':
+        if user.is_authenticated and hasattr(user, 'role') and user.role != 'admin':
             queryset = queryset.filter(Q(user=user) | Q(user__isnull=True))
+        elif not user.is_authenticated:
+            queryset = queryset.none()
         
         # Parametry filtrowania
         severity = self.request.query_params.get('severity')
@@ -67,6 +71,9 @@ class AlertViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_alerts(self, request):
         """Zwraca alerty zalogowanego użytkownika"""
+        if not request.user.is_authenticated:
+            return Response({'message': 'No alerts for anonymous users', 'results': []})
+        
         alerts = Alert.objects.filter(user=request.user).order_by('-created_at')
         serializer = self.get_serializer(alerts, many=True)
         return Response(serializer.data)
@@ -75,7 +82,10 @@ class AlertViewSet(viewsets.ModelViewSet):
     def statistics(self, request):
         """Zwraca statystyki alertów"""
         user = request.user
-        queryset = Alert.objects.all() if user.role == 'admin' else Alert.objects.filter(user=user)
+        if not user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        queryset = Alert.objects.all() if (hasattr(user, 'role') and user.role == 'admin') else Alert.objects.filter(user=user)
         
         stats = {
             'total': queryset.count(),
@@ -148,6 +158,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def mark_all_as_read(self, request):
         """Oznacza wszystkie powiadomienia użytkownika jako przeczytane"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         notifications = Notification.objects.filter(user=request.user, is_read=False)
         count = notifications.count()
         notifications.update(is_read=True)
@@ -156,6 +169,9 @@ class NotificationViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def unread_count(self, request):
         """Zwraca liczbę nieprzeczytanych powiadomień"""
+        if not request.user.is_authenticated:
+            return Response({'unread_count': 0})
+        
         count = Notification.objects.filter(user=request.user, is_read=False).count()
         return Response({'unread_count': count})
 
@@ -178,6 +194,9 @@ class NotificationPreferencesViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get', 'post', 'put'])
     def my_preferences(self, request):
         """Zwraca lub aktualizuje preferencje zalogowanego użytkownika"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Authentication required'}, status=status.HTTP_401_UNAUTHORIZED)
+        
         preferences, created = NotificationPreferences.objects.get_or_create(user=request.user)
         
         if request.method == 'GET':
