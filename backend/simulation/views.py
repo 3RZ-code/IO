@@ -1,6 +1,5 @@
 from django.http import JsonResponse
 from .models import SimDevice
-from .old_logic import SimulationLogic
 
 def get_all_devices(request):
     data = list(SimDevice.objects.values(
