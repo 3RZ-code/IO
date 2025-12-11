@@ -1,5 +1,5 @@
-from .models import Device
 from .weather import weather_connection
+from data_acquisition.models import DeviceReading as Device
 
 
 NORMAL_PRIZES = 0.6212

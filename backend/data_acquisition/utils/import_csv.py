@@ -28,5 +28,7 @@ def run():
                 value=float(row["value"]),
                 unit=row["unit"],
                 signal_dbm=int(row["signal_dbm"]),
-                status=row["status"]
+                status=bool(row["status"]),
+                name=row["name"],
+                priority=int(row["priority"])
             )
