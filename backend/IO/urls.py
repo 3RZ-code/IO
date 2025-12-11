@@ -23,7 +23,7 @@ urlpatterns = [
     path('data-acquisition/', include('data_acquisition.urls')),
     path('analysis-reporting/', include('analysis_reporting.urls')),
     path('forecasting/', include('forecasting.urls')),
-    path('optimization-control/', include('optimization_control.urls')),
+    #path('optimization-control/', include('optimization_control.urls')),
     path('alarm-alert/', include('alarm_alert.urls')),
     path('communication/', include('communication.urls')),
     path('security/', include('security.urls')),
