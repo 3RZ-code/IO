@@ -54,6 +54,19 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
 ]
 
+# Swagger / drf-yasg configuration for JWT Bearer auth in UI
+SWAGGER_SETTINGS = {
+    'USE_SESSION_AUTH': False,
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT Bearer token. Format: `Bearer <token>`'
+        }
+    },
+}
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -151,10 +164,12 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',
-#        potem odkomentować i wywalić AllowAny
+#     'DEFAULT_PERMISSION_CLASSES': (
+#         'rest_framework.permissions.AllowAny',
+# #        potem odkomentować i wywalić AllowAny
 #        'rest_framework.permissions.IsAuthenticated',
+     'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.AllowAny',
     ),
 }
 
