@@ -1,0 +1,6 @@
+user_id,device_id,timestamp,source,category,severity,message,details,status,is_quiet_hours,notified,deleted,visible_for
+1,12,2025-10-10 10:00:00,TemperatureSensor01,energy,warning,"Wysokie zużycie energii","Przekroczono średnią o 25%",open,False,True,False,both
+2,8,2025-10-11 12:15:00,WeatherAPI,weather,info,"Prognoza: silny wiatr","Zalecana redukcja obciążenia HVAC",acknowledged,False,True,False,user
+3,10,2025-10-12 06:30:00,PVSystem01,energy,critical,"Awaria panelu PV","Nie generuje mocy od 3h",open,False,False,False,admin
+4,9,2025-10-13 14:45:00,LightingZoneB,system,warning,"Oświetlenie zbyt długo aktywne","Brak ruchu w strefie przez 2h",resolved,True,True,False,both
+1,7,2025-10-14 09:10:00,ReportModule,report,critical,"Nieudany raport miesięczny","Błąd podczas przetwarzania danych OZE",open,False,True,False,admin

@@ -1,6 +1,6 @@
 from django.urls import path
-from . import views
+from .views import get_all_devices
 
 urlpatterns = [
-    path('', views.index, name='index'),
+    path("devices/", get_all_devices),  # GET /simulation/devices/
 ]
