@@ -5,9 +5,16 @@ from django.db.models.functions import TruncDate
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 
 from .models import SimDevice, GenerationHistory, BatteryState
-from .serializers import GenerationHistorySerializer, SimDeviceSerializer, BatteryStateSerializer
+from .serializers import (
+    GenerationHistorySerializer, 
+    SimDeviceSerializer, 
+    BatteryStateSerializer,
+    RunGenerationRangeSerializer
+)
 from .services import (
     simulate_generation_from_weather,
     estimate_energy_kwh_for_forecast,
@@ -63,51 +70,132 @@ class RunGenerationSimulation(APIView):
 
 class RunGenerationSimulationRange(APIView):
     """
-    Generuje i zapisuje symulacje od dnia start do end (YYYY-MM-DD), korzystając z mockowanej pogody.
+    Generuje i zapisuje symulacje od daty start do end.
+    Akceptuje format: YYYY-MM-DD lub YYYY-MM-DDTHH:MM:SS
     Opcjonalnie step_hours (domyślnie 3).
+    Wszystkie symulacje są zapisywane do bazy danych (GenerationHistory).
     """
 
+    @swagger_auto_schema(
+        request_body=RunGenerationRangeSerializer,
+        responses={
+            201: openapi.Response(
+                description="Symulacje zostały wygenerowane i zapisane",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'count': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'start': openapi.Schema(type=openapi.TYPE_STRING),
+                        'end': openapi.Schema(type=openapi.TYPE_STRING),
+                        'step_hours': openapi.Schema(type=openapi.TYPE_INTEGER),
+                        'summary': openapi.Schema(type=openapi.TYPE_OBJECT),
+                        'data': openapi.Schema(
+                            type=openapi.TYPE_ARRAY,
+                            items=openapi.Schema(type=openapi.TYPE_OBJECT)
+                        ),
+                        'message': openapi.Schema(type=openapi.TYPE_STRING),
+                    }
+                )
+            ),
+            400: openapi.Response(description="Błąd walidacji danych"),
+        }
+    )
     def post(self, request):
-        start = request.data.get("start")
-        end = request.data.get("end")
-        step_hours = request.data.get("step_hours", 3)
+        serializer = RunGenerationRangeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        start = serializer.validated_data.get("start")
+        end = serializer.validated_data.get("end")
+        step_hours = serializer.validated_data.get("step_hours", 3)
 
         if not start or not end:
-            return Response({"detail": "Podaj start i end w formacie YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Podaj start i end w formacie YYYY-MM-DD lub YYYY-MM-DDTHH:MM:SS."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             step_hours = int(step_hours)
             if step_hours <= 0:
                 raise ValueError()
         except Exception:
-            return Response({"detail": "step_hours musi być dodatnią liczbą całkowitą."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "step_hours musi być dodatnią liczbą całkowitą."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             tz = timezone.get_current_timezone()
-            start_dt = timezone.datetime.fromisoformat(start).replace(tzinfo=tz)
-            end_dt = timezone.datetime.fromisoformat(end).replace(tzinfo=tz)
-        except Exception:
-            return Response({"detail": "Nieprawidłowy format daty (oczekiwany YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Obsługa formatu YYYY-MM-DD (bez czasu)
+            if len(start) == 10:  # YYYY-MM-DD
+                start_dt = timezone.datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=tz)
+                start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+            else:  # YYYY-MM-DDTHH:MM:SS
+                start_dt = timezone.datetime.fromisoformat(start.replace("Z", "+00:00"))
+                if start_dt.tzinfo is None:
+                    start_dt = start_dt.replace(tzinfo=tz)
+            
+            # Obsługa formatu YYYY-MM-DD (bez czasu)
+            if len(end) == 10:  # YYYY-MM-DD
+                end_dt = timezone.datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=tz)
+                end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            else:  # YYYY-MM-DDTHH:MM:SS
+                end_dt = timezone.datetime.fromisoformat(end.replace("Z", "+00:00"))
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=tz)
+            
+        except Exception as e:
+            return Response(
+                {"detail": f"Nieprawidłowy format daty. Oczekiwany YYYY-MM-DD lub YYYY-MM-DDTHH:MM:SS. Błąd: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        if end_dt < start_dt:
-            return Response({"detail": "end musi być >= start."}, status=status.HTTP_400_BAD_REQUEST)
+        if end_dt <= start_dt:
+            return Response(
+                {"detail": "end musi być późniejsza niż start."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # ustaw koniec na 23:59:59 danego dnia
-        end_dt = end_dt + timezone.timedelta(days=1) - timezone.timedelta(seconds=1)
-
+        # Generuj serię pogodową i zapisz do bazy
         series = generate_mock_series(start_dt, end_dt, step_hours=step_hours)
         entries = []
+        
         for weather in series:
-            entry = simulate_generation_from_weather(weather)
-            entries.append(entry)
+            try:
+                entry = simulate_generation_from_weather(weather)
+                entries.append(entry)
+            except Exception as e:
+                # Kontynuuj nawet jeśli jeden wpis się nie powiódł
+                continue
+
+        if not entries:
+            return Response(
+                {"detail": "Nie udało się wygenerować żadnych symulacji. Sprawdź czy masz aktywne urządzenia (SimDevice)."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = GenerationHistorySerializer(entries, many=True)
+        
+        # Oblicz podsumowanie
+        total_pv = sum(float(e.pv_generation_kw) for e in entries)
+        total_wind = sum(float(e.wind_generation_kw) for e in entries)
+        total = sum(float(e.total_generation_kw) for e in entries)
+        
         return Response(
             {
                 "count": len(entries),
-                "start": start_dt.date().isoformat(),
-                "end": (end_dt.date()).isoformat(),
+                "start": start_dt.isoformat(),
+                "end": end_dt.isoformat(),
+                "step_hours": step_hours,
+                "summary": {
+                    "total_pv_generation_kw": round(total_pv, 3),
+                    "total_wind_generation_kw": round(total_wind, 3),
+                    "total_generation_kw": round(total, 3),
+                },
                 "data": serializer.data,
+                "message": f"Zapisano {len(entries)} symulacji do bazy danych (GenerationHistory)."
             },
             status=status.HTTP_201_CREATED,
         )

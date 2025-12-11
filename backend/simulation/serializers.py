@@ -25,3 +25,21 @@ class BatteryLogSerializer(serializers.ModelSerializer):
         model = BatteryLog
         fields = "__all__"
 
+
+class RunGenerationRangeSerializer(serializers.Serializer):
+    """Serializer dla body requestu w /simulation/generation/run-range/"""
+    start = serializers.CharField(
+        required=True,
+        help_text="Data rozpoczęcia w formacie YYYY-MM-DD lub YYYY-MM-DDTHH:MM:SS"
+    )
+    end = serializers.CharField(
+        required=True,
+        help_text="Data zakończenia w formacie YYYY-MM-DD lub YYYY-MM-DDTHH:MM:SS"
+    )
+    step_hours = serializers.IntegerField(
+        required=False,
+        default=3,
+        min_value=1,
+        help_text="Krok czasowy w godzinach (domyślnie 3)"
+    )
+
