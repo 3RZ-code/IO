@@ -1,6 +1,6 @@
 from django.urls import path
-from . import views
+from .views import OptimizationRecommendation
 
 urlpatterns = [
-    path('', views.index, name='index'),
+    path('', OptimizationRecommendation.as_view(), name='optimization-index'),
 ]

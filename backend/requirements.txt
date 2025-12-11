@@ -3,6 +3,8 @@ psycopg2-binary==2.9.10
 python-dotenv==1.0.0
 djangorestframework
 djangorestframework-simplejwt
+drf-yasg==1.21.7
+setuptools>=65.0.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
 reportlab>=4.0.0
