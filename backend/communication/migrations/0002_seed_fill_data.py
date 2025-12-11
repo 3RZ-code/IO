@@ -7,6 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('communication', '0001_initial'),
+        ('data_acquisition', '0001_initial'),  # Dodano zależność od data_acquisition
     ]
 
     operations = [
