@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django.db.models import Q
+from security.permissions import IsAdmin
 from .models import Alert, Notification, NotificationPreferences
 from .serializers import AlertSerializer, NotificationSerializer, NotificationPreferencesSerializer
 
@@ -12,23 +13,38 @@ class AlertViewSet(viewsets.ModelViewSet):
     """
     ViewSet dla zarządzania alertami.
     Obsługuje CRUD oraz dodatkowe akcje: confirm, mute.
+    
+    Uprawnienia:
+    - CRUD (create, update, delete, list): Tylko admin
+    - Akcje (confirm, mute, my_alerts): Zalogowani użytkownicy
     """
     queryset = Alert.objects.all()
     serializer_class = AlertSerializer
-    # permission_classes = [IsAuthenticated]
-    permission_classes = [AllowAny]  # Temporarily allow all for testing
+    permission_classes = [IsAdmin]  # CRUD tylko dla admina
+    
+    def get_permissions(self):
+        """
+        Różne uprawnienia dla różnych akcji:
+        - CRUD: tylko admin (IsAdmin)
+        - confirm, mute, my_alerts, statistics: zalogowani użytkownicy (IsAuthenticated)
+        """
+        if self.action in ['confirm', 'mute', 'my_alerts', 'statistics']:
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
 
     def get_queryset(self):
         """Filtruje alerty w zależności od roli użytkownika"""
         user = self.request.user
-        queryset = Alert.objects.all()
         
-        # Filtruj według użytkownika jeśli nie jest adminem
-        if user.is_authenticated and hasattr(user, 'role') and user.role != 'admin':
-            queryset = queryset.filter(Q(user=user) | Q(user__isnull=True))
-        elif not user.is_authenticated:
-            queryset = queryset.none()
+        # Admin widzi wszystkie alerty
+        if user.is_authenticated and hasattr(user, 'role') and user.role == 'admin':
+            queryset = Alert.objects.all()
+        # Zwykły użytkownik widzi tylko swoje alerty lub alerty bez przypisania
+        elif user.is_authenticated:
+            queryset = Alert.objects.filter(Q(user=user) | Q(user__isnull=True))
+        else:
+            queryset = Alert.objects.none()
         
         # Parametry filtrowania
         severity = self.request.query_params.get('severity')
@@ -130,6 +146,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     ViewSet dla zarządzania powiadomieniami.
     Obsługuje CRUD oraz akcję mark_as_read.
+    
+    Uprawnienia:
+    - Wszystkie operacje: Tylko zalogowani użytkownicy
+    - Użytkownicy widzą tylko swoje powiadomienia
     """
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
@@ -138,7 +158,12 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Zwraca tylko powiadomienia zalogowanego użytkownika"""
         user = self.request.user
-        queryset = Notification.objects.filter(user=user)
+        
+        # Admin widzi wszystkie powiadomienia, użytkownicy tylko swoje
+        if hasattr(user, 'role') and user.role == 'admin':
+            queryset = Notification.objects.all()
+        else:
+            queryset = Notification.objects.filter(user=user)
         
         # Parametry filtrowania
         is_read = self.request.query_params.get('is_read')
