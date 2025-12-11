@@ -146,4 +146,4 @@ class SimulationLogic:
             "weather_used": weather_data,
             "updated_devices": updated_count,
             "details": results_log
-        }
+        }"""
