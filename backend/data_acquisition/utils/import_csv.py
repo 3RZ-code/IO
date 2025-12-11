@@ -17,7 +17,7 @@ def run():
         reader = csv.DictReader(f)
         for row in reader:
             device, created = Device.objects.get_or_create(
-                device_id=row["device_id"],
+                device_id=int(row["device_id"]),
                 defaults={
                     "name": row["name"],
                     "device_type": row["device_type"],
@@ -54,6 +54,8 @@ def run():
                 
                 reading_value = float(row["value"])
                 reading_signal_dbm = int(row["signal_dbm"])
+                reading_status = row["status"].lower() == "true"
+                reading_priority = int(row["priority"])
 
                 DeviceReading.objects.create(
                     device=device,
@@ -64,7 +66,8 @@ def run():
                     value=reading_value,
                     unit=row["unit"],
                     signal_dbm=reading_signal_dbm,
-                    status=row["status"],
+                    status=reading_status,
+                    priority=reading_priority,
                 )
                 imported_count += 1
             

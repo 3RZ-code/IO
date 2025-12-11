@@ -3,9 +3,10 @@ from .models import DeviceReading, Device
 
 @admin.register(Device)
 class DeviceAdmin(admin.ModelAdmin):
-    list_display = ("id","device_id", "name", "device_type", "location", "is_active")
+    list_display = ("device_id", "name", "device_type", "location", "is_active")
     list_filter = ("device_type", "location", "is_active")
     search_fields = ("device_id", "name", "location")
+    readonly_fields = ("device_id",)
 
 
 @admin.register(DeviceReading)
@@ -13,7 +14,7 @@ class MyModelAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "timestamp",
-        "device",  
+        "device",
         "device_type",
         "location",
         "metric",
@@ -21,6 +22,7 @@ class MyModelAdmin(admin.ModelAdmin):
         "unit",
         "signal_dbm",
         "status",
+        "priority",
     )
     list_filter = (
         "device__device_type", 

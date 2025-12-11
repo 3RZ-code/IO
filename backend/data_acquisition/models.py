@@ -1,7 +1,7 @@
 from django.db import models
 
 class Device(models.Model):
-    device_id = models.CharField(max_length=50, unique=True, db_index=True, help_text="Unikalny identyfikator urządzenia (np. numer seryjny)")
+    device_id = models.IntegerField(primary_key=True, db_index=True, help_text="Unikalny identyfikator urządzenia")
     name = models.CharField(max_length=100, blank=True, help_text="Przyjazna dla użytkownika nazwa")
     device_type = models.CharField(max_length=50, db_index=True)
     location = models.CharField(max_length=200, blank=True, help_text="Główna lokalizacja urządzenia")
@@ -28,7 +28,8 @@ class DeviceReading(models.Model):
     value = models.FloatField()
     unit = models.CharField(max_length=20)
     signal_dbm = models.IntegerField(default=0)
-    status = models.CharField(max_length=50)
+    status = models.BooleanField(default=True, help_text="Status urządzenia (True/False")
+    priority = models.IntegerField(default=1, help_text="Priorytet odczytu")
 
     def __str__(self):
         return f"{self.device.device_id} - {self.metric} @ {self.timestamp}"
