@@ -12,6 +12,7 @@ from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import Report, ReportCriteria, Analysis, Visualization, ReportCompare
 from .serializers import (
@@ -24,6 +25,7 @@ from .serializers import (
 from data_acquisition.models import DeviceReading
 from .utils.analysis_utils import AnalysisUtils
 from .utils.ai_generator import AIGenerator
+from security.permissions import IsAdmin
 
 
 def index(request):
@@ -1754,8 +1756,8 @@ class ReportCriteriaViewSet(viewsets.ModelViewSet):
     """ViewSet dla kryteriów raportów"""
     queryset = ReportCriteria.objects.all()
     serializer_class = ReportCriteriaSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdmin]
 
 
 class ReportViewSet(viewsets.ModelViewSet):
@@ -1765,8 +1767,8 @@ class ReportViewSet(viewsets.ModelViewSet):
         'report_criteria'
     ).all()
     serializer_class = ReportSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdmin]
     
     @action(detail=False, methods=['post'])
     def generate(self, request):
@@ -1942,16 +1944,16 @@ class AnalysisViewSet(viewsets.ModelViewSet):
     """ViewSet dla analiz"""
     queryset = Analysis.objects.prefetch_related('visualizations').all()
     serializer_class = AnalysisSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdmin]
 
 
 class VisualizationViewSet(viewsets.ModelViewSet):
     """ViewSet dla wizualizacji"""
     queryset = Visualization.objects.all()
     serializer_class = VisualizationSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdmin]
     
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):
@@ -1999,8 +2001,8 @@ class ReportCompareViewSet(viewsets.ModelViewSet):
         'report_one', 'report_two'
     ).all()
     serializer_class = ReportCompareSerializer
-    authentication_classes = []
-    permission_classes = []
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAdmin]
     
     @action(detail=False, methods=['post'])
     def compare(self, request):
