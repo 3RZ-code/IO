@@ -198,6 +198,11 @@ class Analysis(models.Model):
         verbose_name=_("Generate Chart")
     )
     
+    has_anomaly = models.BooleanField(
+        default=False,
+        verbose_name=_("Has Anomaly Detected")
+    )
+    
     report = models.ForeignKey(
         Report,
         on_delete=models.CASCADE,

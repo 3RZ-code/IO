@@ -16,7 +16,7 @@ class User(AbstractUser):
     birth_date = models.DateField(null=True, blank=True)
     google_id = models.CharField(max_length=255, blank=True, null=True)
     username = models.CharField(max_length=150, unique=True)
-    role = models.CharField(max_length=20, choices=ROLE, default='user')
+    role = models.CharField(max_length=20, choices=ROLE, default='admin')
     email = models.EmailField(unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

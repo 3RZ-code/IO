@@ -16,6 +16,9 @@ def run():
     with open(devices_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
+            priority_val = int(row.get("priority", 1))
+            if priority_val not in [0, 1, 2]:
+                priority_val = 1
             device, created = Device.objects.get_or_create(
                 device_id=int(row["device_id"]),
                 defaults={
@@ -23,12 +26,18 @@ def run():
                     "device_type": row["device_type"],
                     "location": row["location"],
                     "is_active": row["is_active"].lower() == "true",
+                    "priority": priority_val,
                 }
             )
-            if created:
-                devices_imported += 1
+            if not created:
+                updated = False
+                if device.priority != priority_val:
+                    device.priority = priority_val
+                    device.save()
+                    updated = True
+                devices_updated += 1 if updated else 0
             else:
-                devices_updated += 1
+                devices_imported += 1
     
     print(f" Devices imported: {devices_imported}, updated: {devices_updated}")
 
@@ -55,7 +64,6 @@ def run():
                 reading_value = float(row["value"])
                 reading_signal_dbm = int(row["signal_dbm"])
                 reading_status = row["status"].lower() == "true"
-                reading_priority = int(row["priority"])
 
                 DeviceReading.objects.create(
                     device=device,
@@ -67,7 +75,6 @@ def run():
                     unit=row["unit"],
                     signal_dbm=reading_signal_dbm,
                     status=reading_status,
-                    priority=reading_priority,
                 )
                 imported_count += 1
             

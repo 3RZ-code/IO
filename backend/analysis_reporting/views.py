@@ -422,11 +422,15 @@ class ReportManager:
             anomaly_result['summary'] = f"Wykryto {anomaly_count} anomalii w {len(readings)} pomiarach. Metoda detekcji: IQR (Interquartile Range)."
         
         # Utwórz nową analizę anomalii z wynikami obliczeń
+        # Ustaw has_anomaly na True jeśli wykryto co najmniej jedną anomalię
+        anomaly_detected = anomaly_result.get('anomaly_count', 0) > 0
+        
         anomaly_analysis = Analysis.objects.create(
             analysis_type=Analysis.AnalysisType.ANOMALY,
             analysis_title=title,
             analysis_summary=json.dumps(anomaly_result),
             generate_chart=generate_chart,
+            has_anomaly=anomaly_detected,
             report=report
         )
         
