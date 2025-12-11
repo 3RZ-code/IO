@@ -4,8 +4,9 @@ from .models import SimDevice
 
 # --- IMPORT MODUŁÓW (OPTYMALIZACJA) ---
 try:
-    from optimization_control.weather import weather_connection
-    from optimization_control.models import Device as OptDevice
+    #from optimization_control.weather import weather_connection
+    #from optimization_control.models import Device as OptDevice
+    from .weather_sim import weather_connection
 
     OPTIMIZATION_AVAILABLE = True
 except ImportError:
