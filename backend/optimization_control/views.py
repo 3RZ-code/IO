@@ -24,10 +24,10 @@ def _device_power_kw(device: Device, end_dt):
         .first()
     )
     power_kw = 1.0
-    priority = 5
     if reading:
         power_kw = reading.value if reading.metric.lower() == "power_kw" else 1.0
-        priority = reading.priority
+    # Priority pobieramy z Device, nie z DeviceReading
+    priority = device.priority if device.priority is not None else 5
     return power_kw, priority
 
 
@@ -151,6 +151,7 @@ class OptimizationRecommendation(APIView):
                     "duration_h_default": 1,
                     "priority_rule": "priorytet >=3 -> offpeak jeśli dostępne; mniejszy -> ASAP",
                     "power_kw_source": "metric=='power_kw' z DeviceReading lub 1.0 gdy brak",
+                    "priority_source": "Device.priority (0-2) lub 5 gdy brak",
                 },
             }
         )
