@@ -32,6 +32,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+
 INSTALLED_APPS = [
     'data_acquisition',
     'analysis_reporting',
@@ -41,6 +43,7 @@ INSTALLED_APPS = [
     'communication',
     'security',
     'simulation',
+    'drf_yasg',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

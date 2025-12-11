@@ -1,8 +1,15 @@
 from django.contrib import admin
-from .models import SimDevice
+from .models import SimDevice, GenerationHistory
 
 @admin.register(SimDevice)
 class SimDeviceAdmin(admin.ModelAdmin):
     list_display = ("device_id","type_code","name","status","power_kw")
     search_fields = ("device_id","name")
     list_filter = ("type_code","status")
+
+
+@admin.register(GenerationHistory)
+class GenerationHistoryAdmin(admin.ModelAdmin):
+    list_display = ("timestamp", "location", "total_generation_kw", "pv_generation_kw", "wind_generation_kw", "cloudiness_pct")
+    search_fields = ("location",)
+    list_filter = ("location", "cloudiness_pct")
