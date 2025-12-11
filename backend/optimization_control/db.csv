@@ -1,7 +1,0 @@
-device_id,name,power,worktime,current_hours,priority,status
-1,Lodówka Samsung,150,24,12:00-24:00,1,True
-2,Pralka Bosch,2000,2,13:00-14:00,2,False
-3,Zmywarka Whirlpool,1800,2,10:00-12:00,0,False
-4,Czajnik Philips,2200,0,10:00:12:00,0,False
-5,Telewizor LG,120,5,13:00-15:00,1,True
-6,Komputer PC,500,8,16:00-18:00,2,True

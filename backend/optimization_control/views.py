@@ -10,14 +10,10 @@ from data_acquisition.models import Device, DeviceReading
 from simulation.models import GenerationHistory, BatteryState
 
 
-# Ceny taryf (zł/kWh)
-TARIFF_DAY_PRICE = 0.6212  # Strefa dzienna
-TARIFF_NIGHT_PRICE = 0.6036  # Strefa nocna
+TARIFF_DAY_PRICE = 0.6212
+TARIFF_NIGHT_PRICE = 0.6036
 
-# Harmonogram taryf
-# Pon-Pt: 22-06 nocna, 13-15 nocna, reszta dzienna
-# Weekend: cały dzień nocna
-NIGHT_HOURS_WEEKDAY = {22, 23, 0, 1, 2, 3, 4, 5, 13, 14}  # 22-06 i 13-15
+NIGHT_HOURS_WEEKDAY = {22, 23, 0, 1, 2, 3, 4, 5, 13, 14}
 
 
 def _parse_dt(value: str, tz):
@@ -33,24 +29,15 @@ def _device_power_kw(device: Device, end_dt):
     power_kw = 1.0
     if reading:
         power_kw = reading.value if reading.metric.lower() == "power_kw" else 1.0
-    # Priority pobieramy z Device, nie z DeviceReading
     priority = device.priority if device.priority is not None else 5
     return power_kw, priority
 
 
 def _get_tariff_for_datetime(dt):
-    """
-    Zwraca taryfę dla danego datetime.
-    Returns: 'night' lub 'day'
-    """
-    weekday = dt.weekday()  # 0=Monday, 6=Sunday
+    weekday = dt.weekday()
     hour = dt.hour
-    
-    # Weekend (sobota=5, niedziela=6) - cały dzień nocna
     if weekday >= 5:
         return 'night'
-    
-    # Pon-Pt
     if hour in NIGHT_HOURS_WEEKDAY:
         return 'night'
     else:
@@ -58,27 +45,15 @@ def _get_tariff_for_datetime(dt):
 
 
 def _get_tariff_price(tariff):
-    """Zwraca cenę taryfy w zł/kWh"""
     return TARIFF_NIGHT_PRICE if tariff == 'night' else TARIFF_DAY_PRICE
 
 
 def _calculate_cost(energy_kwh, tariff):
-    """Oblicza koszt energii w zł"""
     price = _get_tariff_price(tariff)
     return round(energy_kwh * price, 4)
 
 
 class OptimizationRecommendation(APIView):
-    """
-    Generuje rekomendację harmonogramu włączania urządzeń z uwzględnieniem taryf:
-    - Taryfa dzienna: 0.6212 zł/kWh
-    - Taryfa nocna: 0.6036 zł/kWh
-    - Pon-Pt: 22-06 i 13-15 nocna, reszta dzienna
-    - Weekend: cały dzień nocna
-    - Oblicza oszczędności przy optymalizacji harmonogramu
-    - Używa danych z data_acquisition i simulation
-    """
-
     def post(self, request):
         tz = timezone.get_current_timezone()
 
@@ -101,35 +76,28 @@ class OptimizationRecommendation(APIView):
         if not devices.exists():
             return Response({"detail": "Brak aktywnych urządzeń w data_acquisition.Device"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Generuj sloty czasowe (co godzinę)
         slots = []
         cur = start_dt
         while cur < end_dt:
             slots.append(cur)
             cur += timedelta(hours=1)
 
-        # Podziel sloty na taryfy
         night_slots = [s for s in slots if _get_tariff_for_datetime(s) == 'night']
         day_slots = [s for s in slots if _get_tariff_for_datetime(s) == 'day']
 
-        # Produkcja energii z simulation
         gen_qs = GenerationHistory.objects.filter(timestamp__gte=start_dt, timestamp__lt=end_dt)
         total_generation_kwh = float(sum(g.total_generation_kw for g in gen_qs)) if gen_qs.exists() else 0.0
 
-        # Bateria z simulation
         battery, _ = BatteryState.objects.get_or_create(id=1, defaults={"max_capacity_kwh": Decimal("100.000")})
         battery_available = float(battery.current_charge_kwh)
 
-        # Pobierz dane urządzeń
         devices_with_meta = []
         for d in devices:
             power_kw, prio = _device_power_kw(d, end_dt)
             devices_with_meta.append((d, power_kw, prio))
-        
-        # Sortuj po priorytecie (niższy priorytet = wyższa liczba = później)
-        devices_with_meta.sort(key=lambda x: x[2])  # ascending priority
 
-        # OPTYMALNY harmonogram (niskie priorytety -> taryfa nocna)
+        devices_with_meta.sort(key=lambda x: x[2])
+
         optimal_schedule = []
         battery_remaining_optimal = battery_available
         night_idx = 0
@@ -139,7 +107,6 @@ class OptimizationRecommendation(APIView):
             duration_h = 1
             need_kwh = power_kw * duration_h
 
-            # Wybierz slot: niski priorytet (>=2) -> taryfa nocna jeśli dostępna
             if prio >= 2 and night_idx < len(night_slots):
                 start_slot = night_slots[night_idx]
                 night_idx += 1
@@ -174,7 +141,6 @@ class OptimizationRecommendation(APIView):
                 "cost_pln": cost,
             })
 
-        # REFERENCYJNY harmonogram (wszystko ASAP, bez optymalizacji)
         reference_schedule = []
         battery_remaining_ref = battery_available
         slot_idx = 0
@@ -209,13 +175,11 @@ class OptimizationRecommendation(APIView):
                 "cost_pln": cost,
             })
 
-        # Oblicz koszty i oszczędności
         optimal_total_cost = sum(item["cost_pln"] for item in optimal_schedule)
         reference_total_cost = sum(item["cost_pln"] for item in reference_schedule)
         savings_pln = round(reference_total_cost - optimal_total_cost, 4)
         savings_percent = round((savings_pln / reference_total_cost * 100) if reference_total_cost > 0 else 0, 2)
 
-        # Oblicz różnicę w użyciu taryf
         optimal_night_kwh = sum(item["grid_energy_kwh"] for item in optimal_schedule if item["tariff"] == "night")
         optimal_day_kwh = sum(item["grid_energy_kwh"] for item in optimal_schedule if item["tariff"] == "day")
         reference_night_kwh = sum(item["grid_energy_kwh"] for item in reference_schedule if item["tariff"] == "night")
