@@ -6,11 +6,16 @@
 
 ## 🎯 Cel
 
-Endpoint generuje **optymalny harmonogram włączania urządzeń** na podstawie:
-- Priorytetów urządzeń
-- Dostępności baterii
-- Taryf energetycznych (off-peak vs peak)
-- Produkcji energii z modułu `simulation`
+Endpoint generuje **optymalny harmonogram włączania urządzeń** z obliczaniem oszczędności na podstawie:
+- Priorytetów urządzeń (z `data_acquisition.Device`)
+- Dostępności baterii (z `simulation.BatteryState`)
+- **Taryf energetycznych z harmonogramem tygodniowym:**
+  - Taryfa dzienna: **0.6212 zł/kWh**
+  - Taryfa nocna: **0.6036 zł/kWh**
+  - Pon-Pt: 22:00-06:00 i 13:00-15:00 = nocna, reszta = dzienna
+  - Weekend: cały dzień = nocna
+- Produkcji energii z modułu `simulation.GenerationHistory`
+- Oblicza **oszczędności** przy optymalizacji harmonogramu
 
 ## 📥 Request
 
@@ -63,15 +68,40 @@ Content-Type: application/json
     "start": "2025-12-12T00:00:00+01:00",
     "end": "2025-12-13T00:00:00+01:00"
   },
+  "tariffs": {
+    "day_price_pln_per_kwh": 0.6212,
+    "night_price_pln_per_kwh": 0.6036,
+    "schedule": {
+      "weekday": "22:00-06:00 i 13:00-15:00 = nocna, reszta = dzienna",
+      "weekend": "cały dzień = nocna"
+    }
+  },
   "summary": {
-    "devices": 5,
+    "devices_count": 5,
     "total_demand_kwh": 12.5,
-    "generation_kw_window_sum": 45.2,
+    "generation_kwh": 45.2,
     "battery_start_kwh": 50.0,
     "battery_used_kwh": 12.5,
     "battery_remaining_kwh": 37.5
   },
-  "schedule": [
+  "costs": {
+    "optimal_total_pln": 7.5234,
+    "reference_total_pln": 7.7650,
+    "savings_pln": 0.2416,
+    "savings_percent": 3.11
+  },
+  "energy_distribution": {
+    "optimal": {
+      "night_kwh": 8.5,
+      "day_kwh": 4.0
+    },
+    "reference": {
+      "night_kwh": 3.2,
+      "day_kwh": 9.3
+    },
+    "shift_to_night_kwh": 5.3
+  },
+  "optimal_schedule": [
     {
       "device_id": 1,
       "device_name": "Klimatyzacja",
@@ -79,10 +109,11 @@ Content-Type: application/json
       "power_kw": 2.5,
       "start": "2025-12-12T06:00:00+01:00",
       "end": "2025-12-12T07:00:00+01:00",
-      "tariff": "peak",
+      "tariff": "day",
       "energy_kwh": 2.5,
       "battery_used_kwh": 2.5,
-      "source": "battery+grid"
+      "grid_energy_kwh": 0.0,
+      "cost_pln": 0.0
     },
     {
       "device_id": 2,
@@ -91,19 +122,28 @@ Content-Type: application/json
       "power_kw": 1.0,
       "start": "2025-12-12T22:00:00+01:00",
       "end": "2025-12-12T23:00:00+01:00",
-      "tariff": "offpeak",
+      "tariff": "night",
       "energy_kwh": 1.0,
       "battery_used_kwh": 0.0,
-      "source": "offpeak_grid"
+      "grid_energy_kwh": 1.0,
+      "cost_pln": 0.6036
     }
   ],
-  "assumptions": {
-    "offpeak_hours": [0, 1, 2, 3, 4, 5, 22, 23],
-    "duration_h_default": 1,
-    "priority_rule": "priorytet >=3 -> offpeak jeśli dostępne; mniejszy -> ASAP",
-    "power_kw_source": "metric=='power_kw' z DeviceReading lub 1.0 gdy brak",
-    "priority_source": "Device.priority (0-2) lub 5 gdy brak"
-  }
+  "reference_schedule": [
+    {
+      "device_id": 1,
+      "device_name": "Klimatyzacja",
+      "priority": 0,
+      "power_kw": 2.5,
+      "start": "2025-12-12T00:00:00+01:00",
+      "end": "2025-12-12T01:00:00+01:00",
+      "tariff": "night",
+      "energy_kwh": 2.5,
+      "battery_used_kwh": 2.5,
+      "grid_energy_kwh": 0.0,
+      "cost_pln": 0.0
+    }
+  ]
 }
 ```
 
@@ -135,11 +175,17 @@ Content-Type: application/json
 
 ### Krok 2: Definicja Taryf
 
-**Off-Peak (tańsze godziny):** 22:00 - 05:59 (noc)
-- Godziny: `[22, 23, 0, 1, 2, 3, 4, 5]`
+**Taryfa Nocna (tańsza):** 0.6036 zł/kWh
+- **Poniedziałek-Piątek:**
+  - 22:00 - 06:00 (noc)
+  - 13:00 - 15:00 (południe)
+- **Weekend (sobota-niedziela):**
+  - Cały dzień (24h)
 
-**Peak (droższe godziny):** 06:00 - 21:59 (dzień)
-- Wszystkie pozostałe godziny
+**Taryfa Dzienna (droższa):** 0.6212 zł/kWh
+- **Poniedziałek-Piątek:**
+  - 06:00 - 13:00
+  - 15:00 - 22:00
 
 ### Krok 3: Sortowanie Urządzeń
 
@@ -150,12 +196,14 @@ Urządzenia są sortowane **rosnąco po priorytecie**:
 
 ### Krok 4: Harmonogramowanie
 
-Dla każdego urządzenia:
+Endpoint generuje **DWA harmonogramy**:
 
+#### A) Harmonogram Optymalny
+Dla każdego urządzenia:
 1. **Wybór slotu czasowego:**
-   - Jeśli `priority >= 3` → próbuje umieścić w **off-peak** (jeśli dostępne)
-   - Jeśli `priority < 3` → umieszcza w **peak** (ASAP)
-   - Jeśli brak slotów peak → używa off-peak
+   - Jeśli `priority >= 2` → próbuje umieścić w **taryfie nocnej** (jeśli dostępne)
+   - Jeśli `priority < 2` → umieszcza w **taryfie dziennej** (ASAP)
+   - Jeśli brak slotów dziennych → używa nocnych
    - Jeśli brak wszystkich slotów → używa ostatniego dostępnego
 
 2. **Użycie baterii:**
@@ -163,16 +211,22 @@ Dla każdego urządzenia:
    - Jeśli bateria się wyczerpie → przechodzi na sieć
    - `battery_used_kwh` = min(pozostała bateria, zapotrzebowanie urządzenia)
 
-3. **Źródło energii:**
-   - `"battery+grid"` - jeśli użyto baterii
-   - `"offpeak_grid"` - jeśli tylko sieć w godzinach off-peak
-   - `"peak_grid"` - jeśli tylko sieć w godzinach peak
+3. **Obliczanie kosztów:**
+   - `grid_energy_kwh` = zapotrzebowanie - energia z baterii
+   - `cost_pln` = grid_energy_kwh × cena_taryfy
 
-### Krok 5: Obliczenia
+#### B) Harmonogram Referencyjny (bez optymalizacji)
+- Wszystkie urządzenia uruchamiane **ASAP** (kolejno)
+- Bez przesuwania do tańszych taryf
+- Używany do porównania i obliczenia oszczędności
 
-- **total_demand_kwh** - Suma zapotrzebowania wszystkich urządzeń
-- **battery_used_kwh** - Całkowita energia zużyta z baterii
-- **battery_remaining_kwh** - Pozostała energia w baterii
+### Krok 5: Obliczenia Oszczędności
+
+- **optimal_total_pln** - Koszt w harmonogramie optymalnym
+- **reference_total_pln** - Koszt w harmonogramie referencyjnym
+- **savings_pln** - Oszczędności w złotych (reference - optimal)
+- **savings_percent** - Oszczędności w procentach
+- **shift_to_night_kwh** - Ile kWh zostało przesunięte do taryfy nocnej
 
 ## 📊 Przykłady Użycia
 
