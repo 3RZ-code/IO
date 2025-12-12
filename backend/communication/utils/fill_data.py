@@ -20,6 +20,7 @@ def reset_sequence(model_class):
 def fill_schedules(apps, schema_editor):
 
     Schedule = apps.get_model('communication', 'Schedule')
+    Device = apps.get_model('data_acquisition', 'Device')
     User = apps.get_model('auth', 'User')
     
     if Schedule.objects.exists():
@@ -47,9 +48,17 @@ def fill_schedules(apps, schema_editor):
                 finish_date = None if row['finish_date'] == '' else datetime.strptime(row['finish_date'], '%Y-%m-%d').date()
                 working_period = None if row['working_period'] == 'NULL' else datetime.strptime(row['working_period'], '%H:%M:%S').time()
 
+                # Pobierz obiekt Device na podstawie device_id z CSV
+                device_id = int(row['device_id'])
+                try:
+                    device = Device.objects.get(device_id=device_id)
+                except Device.DoesNotExist:
+                    print(f"\nDevice with id {device_id} not found, skipping schedule.")
+                    continue
+
                 schedule_instance = Schedule(
                     schedule_id=int(row['schedule_id']),
-                    device_id=int(row['device_id']),
+                    device=device,
                     user_id=int(row['user_id']),
                     start_date=datetime.strptime(row['start_date'], '%Y-%m-%d').date(),
                     finish_date=finish_date,
@@ -68,6 +77,7 @@ def fill_schedules(apps, schema_editor):
 
 def fill_schedules_cli():
     from communication.models import Schedule
+    from data_acquisition.models import Device
     
     # Always try to reset sequence to ensure consistency
     try:
@@ -98,9 +108,20 @@ def fill_schedules_cli():
                     working_period = None if row.get('working_period', 'NULL') == 'NULL' else datetime.strptime(row['working_period'], '%H:%M:%S').time()
                     power_consumption = None if row.get('power_consumpted', 'NULL') == 'NULL' else float(row['power_consumpted'])
 
+                    # Pobierz obiekt Device na podstawie device_id z CSV
+                    device_id = int(row['device_id']) if row.get('device_id') else None
+                    if device_id is None:
+                        print(f"Missing device_id in row, skipping: {row}")
+                        continue
+                    try:
+                        device = Device.objects.get(device_id=device_id)
+                    except Device.DoesNotExist:
+                        print(f"Device with id {device_id} not found, skipping schedule.")
+                        continue
+
                     schedule_instance = Schedule(
                         schedule_id=int(row['schedule_id']) if row.get('schedule_id') else None,
-                        device_id=int(row['device_id']) if row.get('device_id') else None,
+                        device=device,
                         user_id=row.get('user_id', ''),
                         start_date=datetime.strptime(row['start_date'], '%Y-%m-%d').date(),
                         finish_date=finish_date,
