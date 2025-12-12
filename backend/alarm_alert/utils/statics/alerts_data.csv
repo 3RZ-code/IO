@@ -1,6 +1,12 @@
-user_id,device_id,timestamp,source,category,severity,message,details,status,is_quiet_hours,notified,deleted,visible_for
-1,12,2025-10-10 10:00:00,TemperatureSensor01,energy,warning,"Wysokie zużycie energii","Przekroczono średnią o 25%",open,False,True,False,both
-2,8,2025-10-11 12:15:00,WeatherAPI,weather,info,"Prognoza: silny wiatr","Zalecana redukcja obciążenia HVAC",acknowledged,False,True,False,user
-3,10,2025-10-12 06:30:00,PVSystem01,energy,critical,"Awaria panelu PV","Nie generuje mocy od 3h",open,False,False,False,admin
-4,9,2025-10-13 14:45:00,LightingZoneB,system,warning,"Oświetlenie zbyt długo aktywne","Brak ruchu w strefie przez 2h",resolved,True,True,False,both
-1,7,2025-10-14 09:10:00,ReportModule,report,critical,"Nieudany raport miesięczny","Błąd podczas przetwarzania danych OZE",open,False,True,False,admin
+user_email,title,description,severity,status,category,source,is_muted
+admin@example.com,Critical System Alert,System temperature exceeded safe limits - immediate action required,CRITICAL,NEW,system,monitoring_system,false
+user@example.com,High Energy Consumption,Energy consumption in sector B exceeded threshold by 25%,WARNING,NEW,energy,energy_monitor,false
+admin@example.com,PV Panel Failure,Solar panel PV01 not generating power for 3 hours,CRITICAL,NEW,energy,pv_system,false
+user@example.com,Lighting Zone Active,Lighting in zone B active with no motion detected for 2 hours,WARNING,CONFIRMED,system,lighting_system,false
+admin@example.com,Monthly Report Failed,Error processing renewable energy data for monthly report,CRITICAL,NEW,report,report_module,false
+user@example.com,Weather Warning,Strong wind forecast - HVAC load reduction recommended,INFO,NEW,weather,weather_api,false
+,Maintenance Reminder,Regular maintenance scheduled for all devices tomorrow,INFO,NEW,maintenance,scheduler,false
+user@example.com,Battery Level Low,Backup battery system at 15% capacity,WARNING,NEW,energy,battery_monitor,false
+admin@example.com,Network Connectivity Issue,Intermittent connection to remote sensors detected,WARNING,CONFIRMED,system,network_monitor,false
+user@example.com,Temperature Optimal,All zones within optimal temperature range,INFO,CLOSED,system,hvac_system,false
+

@@ -1,7 +1,8 @@
 import csv
 import os
-from datetime import datetime
-from alarm_alert.models import Alert
+from datetime import datetime, time
+from alarm_alert.models import Alert, Notification, NotificationPreferences
+from security.models import User
 
 
 def fill_alerts_from_csv():
@@ -22,20 +23,19 @@ def fill_alerts_from_csv():
         reader = csv.DictReader(csv_file)
         for row in reader:
             try:
+                user = None
+                if row.get("user_email"):
+                    user = User.objects.filter(email=row["user_email"]).first()
+
                 alert_instance = Alert(
-                    user_id=int(row["user_id"]) if row["user_id"] else None,
-                    device_id=int(row["device_id"]) if row["device_id"] else None,
-                    timestamp=datetime.strptime(row["timestamp"], "%Y-%m-%d %H:%M:%S"),
-                    source=row["source"],
-                    category=row["category"],
+                    user=user,
+                    title=row["title"],
+                    description=row["description"],
                     severity=row["severity"],
-                    message=row["message"],
-                    details=row["details"],
-                    status=row["status"],
-                    is_quiet_hours=row["is_quiet_hours"].lower() == "true",
-                    notified=row["notified"].lower() == "true",
-                    deleted=row["deleted"].lower() == "true",
-                    visible_for=row["visible_for"],
+                    status=row.get("status", "NEW"),
+                    category=row["category"],
+                    source=row["source"],
+                    is_muted=row.get("is_muted", "false").lower() == "true",
                 )
                 alerts_to_create.append(alert_instance)
             except Exception as e:
@@ -46,3 +46,76 @@ def fill_alerts_from_csv():
         print(f" Loaded {len(alerts_to_create)} alerts from {file_path}")
     else:
         print("No alerts created.")
+
+
+def create_sample_data():
+    
+    admin_user = User.objects.filter(role='admin').first()
+    regular_user = User.objects.filter(role='user').first()
+    
+    if not admin_user or not regular_user:
+        print("Users not found. Please create users first.")
+        return
+    
+    alerts_data = [
+        {
+            'user': admin_user,
+            'title': 'Critical System Alert',
+            'description': 'System temperature exceeded safe limits',
+            'severity': 'CRITICAL',
+            'status': 'NEW',
+            'category': 'system',
+            'source': 'monitoring_system',
+        },
+        {
+            'user': regular_user,
+            'title': 'Energy Consumption Warning',
+            'description': 'High energy consumption detected in sector B',
+            'severity': 'WARNING',
+            'status': 'NEW',
+            'category': 'energy',
+            'source': 'energy_monitor',
+        },
+        {
+            'user': regular_user,
+            'title': 'Maintenance Reminder',
+            'description': 'Regular maintenance scheduled for tomorrow',
+            'severity': 'INFO',
+            'status': 'NEW',
+            'category': 'maintenance',
+            'source': 'scheduler',
+        },
+    ]
+    
+    for alert_data in alerts_data:
+        Alert.objects.create(**alert_data)
+    
+    print(f"Created {len(alerts_data)} sample alerts")
+    
+
+    NotificationPreferences.objects.get_or_create(
+        user=admin_user,
+        defaults={
+            'quiet_hours_start': time(22, 0),
+            'quiet_hours_end': time(7, 0),
+            'is_active': True,
+        }
+    )
+    
+    NotificationPreferences.objects.get_or_create(
+        user=regular_user,
+        defaults={
+            'quiet_hours_start': time(23, 0),
+            'quiet_hours_end': time(8, 0),
+            'is_active': True,
+        }
+    )
+    
+    print("Created notification preferences for users")
+
+
+def fill_alerts_cli():
+    print("Importing CSV data for Alerts...")
+    fill_alerts_from_csv()
+    print("Alerts import finished.")
+

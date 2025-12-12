@@ -88,7 +88,7 @@ python manage.py shell -c "from communication.utils.fill_data import fill_schedu
 echo "Schedule import finished."
 
 echo "Importing CSV data for Alerts..."
-python manage.py shell -c "from alarm_alert.utils.fill_data import fill_alerts_from_csv; fill_alerts_from_csv()" || echo "Alert import failed."
+python manage.py shell -c "from alarm_alert.utils.fill_data import fill_alerts_cli; fill_alerts_cli()" || echo "Alert import failed."
 echo "Alerts import finished."
 
 echo "Starting server..."
