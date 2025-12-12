@@ -10,7 +10,10 @@ from data_acquisition.models import Device, DeviceReading
 from simulation.models import GenerationHistory, BatteryState
 
 
-OFFPEAK_HOURS = {22, 23, 0, 1, 2, 3, 4, 5}
+TARIFF_DAY_PRICE = 0.6212
+TARIFF_NIGHT_PRICE = 0.6036
+
+NIGHT_HOURS_WEEKDAY = {22, 23, 0, 1, 2, 3, 4, 5, 13, 14}
 
 
 def _parse_dt(value: str, tz):
@@ -24,21 +27,33 @@ def _device_power_kw(device: Device, end_dt):
         .first()
     )
     power_kw = 1.0
-    priority = 5
     if reading:
         power_kw = reading.value if reading.metric.lower() == "power_kw" else 1.0
-        priority = reading.priority
+    priority = device.priority if device.priority is not None else 5
     return power_kw, priority
 
 
-class OptimizationRecommendation(APIView):
-    """
-    Generuje rekomendację harmonogramu włączania urządzeń:
-    - uruchamia najpierw urządzenia wysokiego priorytetu,
-    - urządzenia niskiego priorytetu pakuje w tańsze godziny (off-peak 22-6),
-    - bateria używana na początku aż do wyczerpania.
-    """
+def _get_tariff_for_datetime(dt):
+    weekday = dt.weekday()
+    hour = dt.hour
+    if weekday >= 5:
+        return 'night'
+    if hour in NIGHT_HOURS_WEEKDAY:
+        return 'night'
+    else:
+        return 'day'
 
+
+def _get_tariff_price(tariff):
+    return TARIFF_NIGHT_PRICE if tariff == 'night' else TARIFF_DAY_PRICE
+
+
+def _calculate_cost(energy_kwh, tariff):
+    price = _get_tariff_price(tariff)
+    return round(energy_kwh * price, 4)
+
+
+class OptimizationRecommendation(APIView):
     def post(self, request):
         tz = timezone.get_current_timezone()
 
@@ -61,96 +76,153 @@ class OptimizationRecommendation(APIView):
         if not devices.exists():
             return Response({"detail": "Brak aktywnych urządzeń w data_acquisition.Device"}, status=status.HTTP_404_NOT_FOUND)
 
-        # slots
         slots = []
         cur = start_dt
         while cur < end_dt:
             slots.append(cur)
             cur += timedelta(hours=1)
 
-        offpeak_slots = [s for s in slots if s.hour in OFFPEAK_HOURS]
-        peak_slots = [s for s in slots if s.hour not in OFFPEAK_HOURS]
+        night_slots = [s for s in slots if _get_tariff_for_datetime(s) == 'night']
+        day_slots = [s for s in slots if _get_tariff_for_datetime(s) == 'day']
 
-        # generation reference
         gen_qs = GenerationHistory.objects.filter(timestamp__gte=start_dt, timestamp__lt=end_dt)
-        total_generation_kw = float(sum(g.total_generation_kw for g in gen_qs)) if gen_qs.exists() else 0.0
+        total_generation_kwh = float(sum(g.total_generation_kw for g in gen_qs)) if gen_qs.exists() else 0.0
 
-        # battery
         battery, _ = BatteryState.objects.get_or_create(id=1, defaults={"max_capacity_kwh": Decimal("100.000")})
         battery_available = float(battery.current_charge_kwh)
 
-        # build schedule
-        schedule = []
-        battery_remaining = battery_available
-        off_idx = 0
-        peak_idx = 0
-
-        # sort devices: higher priority number = lower priority -> schedule low priority in offpeak
         devices_with_meta = []
         for d in devices:
             power_kw, prio = _device_power_kw(d, end_dt)
             devices_with_meta.append((d, power_kw, prio))
-        devices_with_meta.sort(key=lambda x: x[2])  # ascending priority
+
+        devices_with_meta.sort(key=lambda x: x[2])
+
+        optimal_schedule = []
+        battery_remaining_optimal = battery_available
+        night_idx = 0
+        day_idx = 0
 
         for device, power_kw, prio in devices_with_meta:
             duration_h = 1
             need_kwh = power_kw * duration_h
 
-            # choose slot: low priority (prio high number) -> offpeak if available
-            if prio >= 3 and off_idx < len(offpeak_slots):
-                start_slot = offpeak_slots[off_idx]
-                off_idx += 1
-                tariff = "offpeak"
+            if prio >= 2 and night_idx < len(night_slots):
+                start_slot = night_slots[night_idx]
+                night_idx += 1
+                tariff = "night"
             else:
-                if peak_idx < len(peak_slots):
-                    start_slot = peak_slots[peak_idx]
-                    peak_idx += 1
-                elif off_idx < len(offpeak_slots):
-                    start_slot = offpeak_slots[off_idx]
-                    off_idx += 1
+                if day_idx < len(day_slots):
+                    start_slot = day_slots[day_idx]
+                    day_idx += 1
+                elif night_idx < len(night_slots):
+                    start_slot = night_slots[night_idx]
+                    night_idx += 1
                 else:
                     start_slot = slots[-1]
-                tariff = "peak"
+                tariff = "day"
 
-            battery_used = min(battery_remaining, need_kwh)
-            battery_remaining -= battery_used
-            source = "battery+grid" if battery_used > 0 else f"{tariff}_grid"
+            battery_used = min(battery_remaining_optimal, need_kwh)
+            battery_remaining_optimal -= battery_used
+            grid_energy = need_kwh - battery_used
+            cost = _calculate_cost(grid_energy, tariff)
 
-            schedule.append(
-                {
-                    "device_id": device.device_id,
-                    "device_name": device.name,
-                    "priority": prio,
-                    "power_kw": power_kw,
-                    "start": start_slot.isoformat(),
-                    "end": (start_slot + timedelta(hours=duration_h)).isoformat(),
-                    "tariff": tariff,
-                    "energy_kwh": need_kwh,
-                    "battery_used_kwh": round(battery_used, 3),
-                    "source": source,
+            optimal_schedule.append({
+                "device_id": device.device_id,
+                "device_name": device.name,
+                "priority": prio,
+                "power_kw": power_kw,
+                "start": start_slot.isoformat(),
+                "end": (start_slot + timedelta(hours=duration_h)).isoformat(),
+                "tariff": tariff,
+                "energy_kwh": round(need_kwh, 3),
+                "battery_used_kwh": round(battery_used, 3),
+                "grid_energy_kwh": round(grid_energy, 3),
+                "cost_pln": cost,
+            })
+
+        reference_schedule = []
+        battery_remaining_ref = battery_available
+        slot_idx = 0
+
+        for device, power_kw, prio in devices_with_meta:
+            duration_h = 1
+            need_kwh = power_kw * duration_h
+
+            if slot_idx < len(slots):
+                start_slot = slots[slot_idx]
+                slot_idx += 1
+            else:
+                start_slot = slots[-1]
+
+            tariff = _get_tariff_for_datetime(start_slot)
+            battery_used = min(battery_remaining_ref, need_kwh)
+            battery_remaining_ref -= battery_used
+            grid_energy = need_kwh - battery_used
+            cost = _calculate_cost(grid_energy, tariff)
+
+            reference_schedule.append({
+                "device_id": device.device_id,
+                "device_name": device.name,
+                "priority": prio,
+                "power_kw": power_kw,
+                "start": start_slot.isoformat(),
+                "end": (start_slot + timedelta(hours=duration_h)).isoformat(),
+                "tariff": tariff,
+                "energy_kwh": round(need_kwh, 3),
+                "battery_used_kwh": round(battery_used, 3),
+                "grid_energy_kwh": round(grid_energy, 3),
+                "cost_pln": cost,
+            })
+
+        optimal_total_cost = sum(item["cost_pln"] for item in optimal_schedule)
+        reference_total_cost = sum(item["cost_pln"] for item in reference_schedule)
+        savings_pln = round(reference_total_cost - optimal_total_cost, 4)
+        savings_percent = round((savings_pln / reference_total_cost * 100) if reference_total_cost > 0 else 0, 2)
+
+        optimal_night_kwh = sum(item["grid_energy_kwh"] for item in optimal_schedule if item["tariff"] == "night")
+        optimal_day_kwh = sum(item["grid_energy_kwh"] for item in optimal_schedule if item["tariff"] == "day")
+        reference_night_kwh = sum(item["grid_energy_kwh"] for item in reference_schedule if item["tariff"] == "night")
+        reference_day_kwh = sum(item["grid_energy_kwh"] for item in reference_schedule if item["tariff"] == "day")
+
+        total_demand = sum(item["energy_kwh"] for item in optimal_schedule)
+        battery_used_total = battery_available - battery_remaining_optimal
+
+        return Response({
+            "window": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
+            "tariffs": {
+                "day_price_pln_per_kwh": TARIFF_DAY_PRICE,
+                "night_price_pln_per_kwh": TARIFF_NIGHT_PRICE,
+                "schedule": {
+                    "weekday": "22:00-06:00 i 13:00-15:00 = nocna, reszta = dzienna",
+                    "weekend": "cały dzień = nocna"
                 }
-            )
-
-        total_demand = sum(item["energy_kwh"] for item in schedule)
-        battery_used_total = battery_available - battery_remaining
-
-        return Response(
-            {
-                "window": {"start": start_dt.isoformat(), "end": end_dt.isoformat()},
-                "summary": {
-                    "devices": len(schedule),
-                    "total_demand_kwh": round(total_demand, 3),
-                    "generation_kw_window_sum": round(total_generation_kw, 3),
-                    "battery_start_kwh": round(battery_available, 3),
-                    "battery_used_kwh": round(battery_used_total, 3),
-                    "battery_remaining_kwh": round(battery_remaining, 3),
+            },
+            "summary": {
+                "devices_count": len(optimal_schedule),
+                "total_demand_kwh": round(total_demand, 3),
+                "generation_kwh": round(total_generation_kwh, 3),
+                "battery_start_kwh": round(battery_available, 3),
+                "battery_used_kwh": round(battery_used_total, 3),
+                "battery_remaining_kwh": round(battery_remaining_optimal, 3),
+            },
+            "costs": {
+                "optimal_total_pln": round(optimal_total_cost, 4),
+                "reference_total_pln": round(reference_total_cost, 4),
+                "savings_pln": savings_pln,
+                "savings_percent": savings_percent,
+            },
+            "energy_distribution": {
+                "optimal": {
+                    "night_kwh": round(optimal_night_kwh, 3),
+                    "day_kwh": round(optimal_day_kwh, 3),
                 },
-                "schedule": schedule,
-                "assumptions": {
-                    "offpeak_hours": sorted(list(OFFPEAK_HOURS)),
-                    "duration_h_default": 1,
-                    "priority_rule": "priorytet >=3 -> offpeak jeśli dostępne; mniejszy -> ASAP",
-                    "power_kw_source": "metric=='power_kw' z DeviceReading lub 1.0 gdy brak",
+                "reference": {
+                    "night_kwh": round(reference_night_kwh, 3),
+                    "day_kwh": round(reference_day_kwh, 3),
                 },
-            }
-        )
+                "shift_to_night_kwh": round(optimal_night_kwh - reference_night_kwh, 3),
+            },
+            "optimal_schedule": optimal_schedule,
+            "reference_schedule": reference_schedule,
+        })

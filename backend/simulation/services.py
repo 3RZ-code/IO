@@ -2,13 +2,68 @@ from datetime import datetime, timedelta, timezone as dt_timezone, date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Dict, Any, Iterable, List
 import random
+import json
+from urllib import request
 
 from django.utils import timezone
 
 from .models import SimDevice, GenerationHistory, BatteryState, BatteryLog
 
 
-LODZ_COORDS = {"lat": 51.7592, "lon": 19.4550, "label": "Lodz"}
+LODZ_COORDS = {"lat": 51.7687323, "lon": 19.4569911, "label": "Lodz"}
+
+
+class WeatherConnection:
+    """
+    Klasa do pobierania danych pogodowych z Open-Meteo API.
+    """
+    
+    def __init__(self, latitude: float = None, longitude: float = None):
+        self.latitude = latitude or LODZ_COORDS["lat"]
+        self.longitude = longitude or LODZ_COORDS["lon"]
+        self.stats = {}
+    
+    def connect(self):
+        """Pobiera dane pogodowe z Open-Meteo API."""
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={self.latitude}&longitude={self.longitude}&"
+            f"daily=wind_speed_10m_max,shortwave_radiation_sum,temperature_2m_max,"
+            f"temperature_2m_min,temperature_2m_mean&"
+            f"hourly=temperature_2m&"
+            f"timezone=Europe/Warsaw"
+        )
+        try:
+            with request.urlopen(url, timeout=10) as response:
+                if response.status != 200:
+                    raise Exception(f"HTTP error: {response.status}")
+                data = response.read()
+                self.stats = json.loads(data)
+                self.stats["error"] = None
+        except Exception as e:
+            self.stats = {"error": f"Could not fetch weather data: {e}"}
+    
+    def get_tomorrow_temp(self):
+        """Zwraca temperaturę na jutro."""
+        if self.stats.get("error") is None and "daily" in self.stats:
+            daily = self.stats["daily"]
+            if len(daily.get("time", [])) > 1 and len(daily.get("temperature_2m_min", [])) > 1:
+                return daily["time"][1], daily["temperature_2m_min"][1]
+        return "Error", "Error"
+    
+    def return_for_simulation(self):
+        """Zwraca dane pogodowe w formacie dla symulacji."""
+        if self.stats.get("error") is None and "daily" in self.stats:
+            daily = self.stats["daily"]
+            return {
+                "time": daily.get("time", []),
+                "wind_speed_10m_max": daily.get("wind_speed_10m_max", []),
+                "shortwave_radiation_sum": daily.get("shortwave_radiation_sum", []),
+                "temperature_2m_max": daily.get("temperature_2m_max", []),
+                "temperature_2m_min": daily.get("temperature_2m_min", []),
+                "temperature_2m_mean": daily.get("temperature_2m_mean", []),
+            }
+        return None
 
 
 def _quantize(value: float, digits: str) -> Decimal:
@@ -178,13 +233,70 @@ def estimate_energy_kwh_from_hourly(hourly_list: Iterable[Dict[str, Any]]) -> Di
     }
 
 
+def _convert_radiation_to_cloudiness(shortwave_radiation_sum: float) -> float:
+    """
+    Konwertuje sumę promieniowania słonecznego (MJ/m²) na procent zachmurzenia.
+    Maksymalne promieniowanie dzienne to około 20-30 MJ/m² (czyste niebo).
+    """
+    if shortwave_radiation_sum is None:
+        return 50.0  # Domyślnie 50% zachmurzenia
+    
+    # Normalizuj do zakresu 0-100%
+    # Zakładamy maksymalne promieniowanie 25 MJ/m² dla czystego nieba
+    max_radiation = 25.0
+    cloudiness = max(0.0, min(100.0, 100.0 * (1.0 - (shortwave_radiation_sum / max_radiation))))
+    return cloudiness
+
+
 def generate_mock_weather(dt_ts: int | None = None) -> Dict[str, Any]:
     """
-    Generuje pojedynczy punkt pogodowy bez zewnętrznego API.
+    Generuje pojedynczy punkt pogodowy używając Open-Meteo API.
+    Jeśli API nie działa, zwraca mockowane dane.
     """
     if dt_ts is None:
         dt_ts = int(timezone.now().timestamp())
-
+    
+    # Próbuj pobrać prawdziwe dane z Open-Meteo
+    try:
+        weather_conn = WeatherConnection()
+        weather_conn.connect()
+        
+        if weather_conn.stats.get("error") is None and "daily" in weather_conn.stats:
+            daily = weather_conn.stats["daily"]
+            times = daily.get("time", [])
+            temps_mean = daily.get("temperature_2m_mean", [])
+            wind_speeds = daily.get("wind_speed_10m_max", [])
+            radiation = daily.get("shortwave_radiation_sum", [])
+            
+            # Znajdź najbliższą datę
+            target_date = datetime.fromtimestamp(dt_ts, tz=timezone.get_current_timezone()).date()
+            target_str = target_date.isoformat()
+            
+            if target_str in times:
+                idx = times.index(target_str)
+                temp = temps_mean[idx] if idx < len(temps_mean) else 15.0
+                wind = wind_speeds[idx] if idx < len(wind_speeds) else 5.0
+                rad = radiation[idx] if idx < len(radiation) else 10.0
+                cloudiness = _convert_radiation_to_cloudiness(rad)
+            else:
+                # Jeśli nie ma dokładnej daty, użyj pierwszej dostępnej lub średniej
+                temp = temps_mean[0] if temps_mean else 15.0
+                wind = wind_speeds[0] if wind_speeds else 5.0
+                rad = radiation[0] if radiation else 10.0
+                cloudiness = _convert_radiation_to_cloudiness(rad)
+            
+            return {
+                "dt": dt_ts,
+                "sys": {"sunrise": None, "sunset": None},
+                "main": {"temp": float(temp)},
+                "wind": {"speed": float(wind)},
+                "clouds": {"all": float(cloudiness)},
+            }
+    except Exception as e:
+        # Fallback do mockowanych danych jeśli API nie działa
+        pass
+    
+    # Fallback: mockowane dane
     return {
         "dt": dt_ts,
         "sys": {"sunrise": None, "sunset": None},
@@ -196,21 +308,74 @@ def generate_mock_weather(dt_ts: int | None = None) -> Dict[str, Any]:
 
 def generate_mock_series(start_dt: datetime, end_dt: datetime, step_hours: int = 24) -> List[Dict[str, Any]]:
     """
-    Generuje serię pogodową z dryfem +/-10% względem poprzedniej wartości.
+    Generuje serię pogodową używając Open-Meteo API.
+    Jeśli API nie działa, używa mockowanych danych z dryfem +/-10%.
     """
     results: List[Dict[str, Any]] = []
-
-    # bazowe losowe startowe
+    
+    # Próbuj pobrać prawdziwe dane z Open-Meteo
+    try:
+        weather_conn = WeatherConnection()
+        weather_conn.connect()
+        
+        if weather_conn.stats.get("error") is None and "daily" in weather_conn.stats:
+            daily = weather_conn.stats["daily"]
+            times = daily.get("time", [])
+            temps_mean = daily.get("temperature_2m_mean", [])
+            wind_speeds = daily.get("wind_speed_10m_max", [])
+            radiation = daily.get("shortwave_radiation_sum", [])
+            
+            cur = start_dt
+            while cur <= end_dt:
+                cur_date_str = cur.date().isoformat()
+                
+                if cur_date_str in times:
+                    idx = times.index(cur_date_str)
+                    temp = temps_mean[idx] if idx < len(temps_mean) else 15.0
+                    wind = wind_speeds[idx] if idx < len(wind_speeds) else 5.0
+                    rad = radiation[idx] if idx < len(radiation) else 10.0
+                    cloudiness = _convert_radiation_to_cloudiness(rad)
+                else:
+                    # Jeśli nie ma danych dla tej daty, użyj najbliższej dostępnej
+                    if times:
+                        # Użyj pierwszej dostępnej wartości
+                        temp = temps_mean[0] if temps_mean else 15.0
+                        wind = wind_speeds[0] if wind_speeds else 5.0
+                        rad = radiation[0] if radiation else 10.0
+                        cloudiness = _convert_radiation_to_cloudiness(rad)
+                    else:
+                        # Fallback
+                        temp = 15.0
+                        wind = 5.0
+                        cloudiness = 50.0
+                
+                results.append({
+                    "dt": int(cur.timestamp()),
+                    "sys": {"sunrise": None, "sunset": None},
+                    "main": {"temp": float(temp)},
+                    "wind": {"speed": float(wind)},
+                    "clouds": {"all": float(cloudiness)},
+                })
+                
+                cur += timedelta(hours=step_hours)
+            
+            if results:
+                return results
+    except Exception as e:
+        # Fallback do mockowanych danych jeśli API nie działa
+        pass
+    
+    # Fallback: mockowane dane z dryfem
     base = generate_mock_weather(int(start_dt.timestamp()))
     results.append(base)
-
+    
     cur = start_dt + timedelta(hours=step_hours)
     last = base
     while cur <= end_dt:
         def jitter(val: float) -> float:
             delta_pct = random.uniform(-0.1, 0.1)  # +/-10%
             return max(0.0, val * (1 + delta_pct))
-
+        
         next_point = {
             "dt": int(cur.timestamp()),
             "sys": {"sunrise": None, "sunset": None},
@@ -221,7 +386,7 @@ def generate_mock_series(start_dt: datetime, end_dt: datetime, step_hours: int =
         results.append(next_point)
         last = next_point
         cur += timedelta(hours=step_hours)
-
+    
     return results
 
 
