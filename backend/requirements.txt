@@ -9,4 +9,5 @@ matplotlib>=3.7.0
 seaborn>=0.12.0
 reportlab>=4.0.0
 Pillow>=10.0.0
+django-cors-headers
 requests>=2.31.0
