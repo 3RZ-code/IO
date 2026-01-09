@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zaproszenie do Grupy</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      .header {
+        background-color: #ffc107;
+        color: #fff;
+        text-align: center;
+        padding: 20px;
+      }
+
+      .header h2 {
+        margin: 0;
+        font-size: 24px;
+      }
+
+      .content {
+        padding: 30px;
+        text-align: center;
+      }
+
+      .content p {
+        font-size: 16px;
+        line-height: 1.6;
+        color: #333;
+        margin-bottom: 20px;
+      }
+
+      .code {
+        display: inline-block;
+        padding: 15px 30px;
+        background-color: #fff3cd;
+        border: 2px solid #ffc107;
+        border-radius: 5px;
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+        letter-spacing: 4px;
+        margin: 20px 0;
+      }
+
+      .footer {
+        text-align: center;
+        font-size: 12px;
+        color: #777;
+        margin-top: 20px;
+        border-top: 1px solid #ddd;
+        padding-top: 10px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="header">
+        <h2>Zaproszenie do Grupy</h2>
+      </div>
+      <div class="content">
+        <p>Witaj,</p>
+        <p>
+          Zostałeś zaproszony do grupy <strong>{{ group_name }}</strong> przez
+          użytkownika <strong>{{ invited_by }}</strong>.
+        </p>
+        <p>Aby dołączyć do grupy, użyj poniższego kodu:</p>
+        <div class="code">{{ code }}</div>
+        <p>Kod jest ważny przez 7 dni od momentu utworzenia.</p>
+        <p>
+          Po zalogowaniu, przejdź do profilu użytkownika i wprowadź kod w sekcji
+          "Dołącz do grupy".
+        </p>
+      </div>
+      <div class="footer">
+        <p>&copy; 2025 IO Project. Wszelkie prawa zastrzeżone.</p>
+      </div>
+    </div>
+  </body>
+</html>
