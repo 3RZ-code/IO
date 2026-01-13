@@ -149,19 +149,31 @@ class CustomLoginView(TokenObtainPairView):
         if data.get('2fa_required'):
             user = serializer.user
             
-            code = ''.join(random.choices(string.digits, k=6))
-            Code.objects.create(user=user, code=code, purpose='TWO_FACTOR')
+            # Sprawdź, czy istnieje już aktywny kod utworzony w ciągu ostatniej minuty
+            recent_code = Code.objects.filter(
+                user=user,
+                purpose='TWO_FACTOR',
+                created_at__gte=timezone.now() - datetime.timedelta(minutes=1)
+            ).order_by('-created_at').first()
             
-            try:
-                subject = 'Weryfikacja Dwuetapowa'
-                html_content = render_to_string('security/2fa_email.html', {'user': user, 'code': code})
-                text_content = f"Twój kod weryfikacyjny to: {code}"
+            if recent_code:
+                # Użyj istniejącego kodu, nie wysyłaj emaila ponownie
+                code = recent_code.code
+            else:
+                # Utwórz nowy kod i wyślij email tylko raz
+                code = ''.join(random.choices(string.digits, k=6))
+                Code.objects.create(user=user, code=code, purpose='TWO_FACTOR')
                 
-                msg = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
-                msg.attach_alternative(html_content, "text/html")
-                msg.send()
-            except Exception as e:
-                print(f"Failed to send 2FA email: {e}")
+                try:
+                    subject = 'Weryfikacja Dwuetapowa'
+                    html_content = render_to_string('security/2fa_email.html', {'user': user, 'code': code})
+                    text_content = f"Twój kod weryfikacyjny to: {code}"
+                    
+                    msg = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
+                    msg.attach_alternative(html_content, "text/html")
+                    msg.send()
+                except Exception as e:
+                    print(f"Failed to send 2FA email: {e}")
                 
             return response.Response(data, status=status.HTTP_200_OK)
             
