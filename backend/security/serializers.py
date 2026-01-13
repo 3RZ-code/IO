@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Code
+from .models import User, Code, GroupInvitation
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.models import Group
 
@@ -50,7 +50,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         
-        # Check if 2FA is enabled
         if self.user.two_factor_enabled:
             return {
                 '2fa_required': True,
@@ -62,3 +61,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 class TwoFactorVerifySerializer(serializers.Serializer):
     user_id = serializers.UUIDField()
     code = serializers.CharField(max_length=6)
+
+class GroupInvitationSerializer(serializers.ModelSerializer):
+    group_name = serializers.CharField(source='group.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True)
+    used_by_name = serializers.CharField(source='used_by.username', read_only=True)
+
+    class Meta:
+        model = GroupInvitation
+        fields = ['id', 'group', 'group_name', 'email', 'code', 'created_by', 'created_by_name', 
+                  'created_at', 'used', 'used_at', 'used_by', 'used_by_name']
+        read_only_fields = ['id', 'code', 'created_by', 'created_at', 'used', 'used_at', 'used_by']
+
+class CreateGroupInvitationSerializer(serializers.Serializer):
+    group_id = serializers.IntegerField()
+    email = serializers.EmailField()
+
+class AcceptGroupInvitationSerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=8)

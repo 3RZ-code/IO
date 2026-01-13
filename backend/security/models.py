@@ -32,6 +32,7 @@ class Code(models.Model):
         ('RESET_PASSWORD', 'Reset Password'),
         ('CREATE_GROUP', 'Create Group'),
         ('TWO_FACTOR', 'Two Factor Auth'),
+        ('GROUP_INVITATION', 'Group Invitation'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -42,3 +43,20 @@ class Code(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.code} ({self.purpose})"
+
+class GroupInvitation(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    group = models.ForeignKey('auth.Group', on_delete=models.CASCADE, related_name='invitations')
+    email = models.EmailField()
+    code = models.CharField(max_length=8, unique=True)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='created_invitations')
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
+    used_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='used_invitations')
+
+    def __str__(self):
+        return f"Invitation to {self.group.name} for {self.email}"
+    
+    class Meta:
+        ordering = ['-created_at']

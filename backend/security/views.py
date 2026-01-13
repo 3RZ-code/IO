@@ -1,6 +1,6 @@
 
 from rest_framework import viewsets, permissions, generics, decorators, response, status
-from .models import User, Code
+from .models import User, Code, GroupInvitation
 from .serializers import (
     UserSerializer,
     UserRegistrationSerializer,
@@ -8,7 +8,10 @@ from .serializers import (
     PasswordResetConfirmSerializer,
     CustomTokenObtainPairSerializer,
     TwoFactorVerifySerializer,
-    GroupSerializer
+    GroupSerializer,
+    GroupInvitationSerializer,
+    CreateGroupInvitationSerializer,
+    AcceptGroupInvitationSerializer
 )
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -51,7 +54,6 @@ class RegisterView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()
         
-        # Send welcome email
         try:
             subject = 'Witamy w Systemie!'
             html_content = render_to_string('security/registration_email.html', {'user': user})
@@ -61,7 +63,6 @@ class RegisterView(generics.CreateAPIView):
             msg.attach_alternative(html_content, "text/html")
             msg.send()
         except Exception as e:
-            # Log error but don't fail registration
             print(f"Failed to send email: {e}")
 
 class PasswordResetRequestView(generics.GenericAPIView):
@@ -76,13 +77,10 @@ class PasswordResetRequestView(generics.GenericAPIView):
         try:
             user = User.objects.get(email=email)
             
-            # Generate 6-digit code
             code = ''.join(random.choices(string.digits, k=6))
             
-            # Create Code object
             Code.objects.create(user=user, code=code, purpose='RESET_PASSWORD')
             
-            # Send email
             try:
                 subject = 'Resetowanie Hasła'
                 html_content = render_to_string('security/password_reset_email.html', {'user': user, 'code': code})
@@ -97,7 +95,6 @@ class PasswordResetRequestView(generics.GenericAPIView):
             return response.Response({"message": "Password reset code sent if email exists."})
             
         except User.DoesNotExist:
-            # Don't reveal user existence
             return response.Response({"message": "Password reset code sent if email exists."})
 
 class PasswordResetConfirmView(generics.GenericAPIView):
@@ -115,7 +112,6 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         try:
             user = User.objects.get(email=email)
             
-            # Verify code
             code_obj = Code.objects.filter(
                 user=user, 
                 code=code, 
@@ -125,15 +121,12 @@ class PasswordResetConfirmView(generics.GenericAPIView):
             if not code_obj:
                 return response.Response({"error": "Invalid code"}, status=400)
                 
-            # Verify expiry (15 minutes)
             if timezone.now() - code_obj.created_at > datetime.timedelta(minutes=15):
                  return response.Response({"error": "Code expired"}, status=400)
                  
-            # Reset password
             user.set_password(new_password)
             user.save()
             
-            # Invalidate code (and potentially older ones)
             code_obj.delete()
             
             return response.Response({"message": "Password has been reset successfully."})
@@ -156,20 +149,31 @@ class CustomLoginView(TokenObtainPairView):
         if data.get('2fa_required'):
             user = serializer.user
             
-            # Generate and send code
-            code = ''.join(random.choices(string.digits, k=6))
-            Code.objects.create(user=user, code=code, purpose='TWO_FACTOR')
+            # Sprawdź, czy istnieje już aktywny kod utworzony w ciągu ostatniej minuty
+            recent_code = Code.objects.filter(
+                user=user,
+                purpose='TWO_FACTOR',
+                created_at__gte=timezone.now() - datetime.timedelta(minutes=1)
+            ).order_by('-created_at').first()
             
-            try:
-                subject = 'Weryfikacja Dwuetapowa'
-                html_content = render_to_string('security/2fa_email.html', {'user': user, 'code': code})
-                text_content = f"Twój kod weryfikacyjny to: {code}"
+            if recent_code:
+                # Użyj istniejącego kodu, nie wysyłaj emaila ponownie
+                code = recent_code.code
+            else:
+                # Utwórz nowy kod i wyślij email tylko raz
+                code = ''.join(random.choices(string.digits, k=6))
+                Code.objects.create(user=user, code=code, purpose='TWO_FACTOR')
                 
-                msg = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
-                msg.attach_alternative(html_content, "text/html")
-                msg.send()
-            except Exception as e:
-                print(f"Failed to send 2FA email: {e}")
+                try:
+                    subject = 'Weryfikacja Dwuetapowa'
+                    html_content = render_to_string('security/2fa_email.html', {'user': user, 'code': code})
+                    text_content = f"Twój kod weryfikacyjny to: {code}"
+                    
+                    msg = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [user.email])
+                    msg.attach_alternative(html_content, "text/html")
+                    msg.send()
+                except Exception as e:
+                    print(f"Failed to send 2FA email: {e}")
                 
             return response.Response(data, status=status.HTTP_200_OK)
             
@@ -189,7 +193,6 @@ class TwoFactorVerifyView(generics.GenericAPIView):
         try:
             user = User.objects.get(id=user_id)
             
-            # Verify code
             code_obj = Code.objects.filter(
                 user=user, 
                 code=code, 
@@ -199,11 +202,9 @@ class TwoFactorVerifyView(generics.GenericAPIView):
             if not code_obj:
                 return response.Response({"error": "Invalid code"}, status=400)
                 
-            # Verify expiry (15 minutes)
             if timezone.now() - code_obj.created_at > datetime.timedelta(minutes=15):
                  return response.Response({"error": "Code expired"}, status=400)
             
-            # Code valid, generate tokens
             code_obj.delete()
             
             refresh = RefreshToken.for_user(user)
@@ -215,3 +216,122 @@ class TwoFactorVerifyView(generics.GenericAPIView):
             
         except User.DoesNotExist:
              return response.Response({"error": "Invalid user"}, status=400)
+
+class GroupInvitationViewSet(viewsets.ModelViewSet):
+    queryset = GroupInvitation.objects.all()
+    serializer_class = GroupInvitationSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    
+    def get_queryset(self):
+        return GroupInvitation.objects.all()
+
+class CreateGroupInvitationView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdmin]
+    serializer_class = CreateGroupInvitationSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        group_id = serializer.validated_data['group_id']
+        email = serializer.validated_data['email']
+        
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return response.Response({"error": "Group not found"}, status=status.HTTP_404_NOT_FOUND)
+        
+        code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        
+        while GroupInvitation.objects.filter(code=code).exists():
+            code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        
+        invitation = GroupInvitation.objects.create(
+            group=group,
+            email=email,
+            code=code,
+            created_by=request.user
+        )
+        
+        try:
+            subject = f'Zaproszenie do grupy {group.name}'
+            context = {
+                'group_name': group.name,
+                'code': code,
+                'invited_by': request.user.username,
+                'email': email
+            }
+            
+            html_content = render_to_string('security/group_invitation_email.html', context)
+            text_content = f"""
+Witaj,
+
+Zostałeś zaproszony do grupy "{group.name}" przez użytkownika {request.user.username}.
+
+Twój kod zaproszenia to: {code}
+
+Kod jest ważny przez 7 dni. Użyj go, aby dołączyć do grupy.
+
+Pozdrawiamy,
+System
+            """
+            
+            msg = EmailMultiAlternatives(subject, text_content, settings.EMAIL_HOST_USER, [email])
+            msg.attach_alternative(html_content, "text/html")
+            msg.send()
+            
+            return response.Response({
+                "message": "Invitation created and sent successfully",
+                "invitation": GroupInvitationSerializer(invitation).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            print(f"Failed to send invitation email: {e}")
+            return response.Response({
+                "message": "Invitation created but email failed to send",
+                "invitation": GroupInvitationSerializer(invitation).data,
+                "warning": "Email could not be sent"
+            }, status=status.HTTP_201_CREATED)
+
+class AcceptGroupInvitationView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = AcceptGroupInvitationSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        code = serializer.validated_data['code']
+        user = request.user
+        
+        try:
+            invitation = GroupInvitation.objects.get(code=code, used=False)
+        except GroupInvitation.DoesNotExist:
+            return response.Response(
+                {"error": "Invalid or already used invitation code"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if invitation.email.lower() != user.email.lower():
+            return response.Response(
+                {"error": "This invitation was sent to a different email address"}, 
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        if timezone.now() - invitation.created_at > datetime.timedelta(days=7):
+            return response.Response(
+                {"error": "Invitation code has expired"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        invitation.group.user_set.add(user)
+        
+        invitation.used = True
+        invitation.used_at = timezone.now()
+        invitation.used_by = user
+        invitation.save()
+        
+        return response.Response({
+            "message": f"Successfully joined group '{invitation.group.name}'",
+            "group": GroupSerializer(invitation.group).data
+        }, status=status.HTTP_200_OK)
