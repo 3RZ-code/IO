@@ -141,6 +141,11 @@ function MainPage() {
               <Paper
                 elevation={4}
                 className="module-square"
+                onClick={() => {
+                  if (mod.name === "Analysis & Reporting") {
+                    navigate("/analysis-reporting");
+                  }
+                }}
                 sx={{
                   aspectRatio: "1/1",
                   width: "300px",
@@ -152,6 +157,8 @@ function MainPage() {
                   minWidth: 0,
                   minHeight: 0,
                   textAlign: "center",
+                  cursor:
+                    mod.name === "Analysis & Reporting" ? "pointer" : "default",
                   transition: "transform 0.2s, box-shadow 0.2s",
                   "&:hover": {
                     transform: "translateY(-5px) scale(1.03)",

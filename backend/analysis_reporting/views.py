@@ -13,6 +13,8 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
 
 from .models import Report, ReportCriteria, Analysis, Visualization, ReportCompare
 from .serializers import (
@@ -302,7 +304,25 @@ class ReportManager:
                 trends_result['summary'] = f"Analiza trendu na podstawie {len(readings)} pomiarów. Kierunek trendu: {trends_result.get('trend_direction', 'N/A')}, zmiana: {trends_result.get('change_percentage', 0):.2f}%."
         else:
             print("ℹ TRENDS: używam statycznego podsumowania")
-            trends_result['summary'] = f"Analiza trendu na podstawie {len(readings)} pomiarów. Kierunek trendu: {trends_result.get('trend_direction', 'N/A')}, zmiana: {trends_result.get('change_percentage', 0):.2f}%."
+            # Stwórz bardziej szczegółowy opis
+            trend = trends_result.get('trend', 'nieznany')
+            direction = trends_result.get('trend_direction', 'N/A')
+            change_pct = trends_result.get('change_percentage', 0)
+            first_avg = trends_result.get('first_period_avg', 0)
+            second_avg = trends_result.get('second_period_avg', 0)
+            
+            trend_desc = {
+                'stable': 'stabilny poziom',
+                'increasing': 'trend wzrostowy',
+                'decreasing': 'trend spadkowy'
+            }.get(trend, 'nieznany trend')
+            
+            trends_result['summary'] = (
+                f"Analiza trendu na podstawie {len(readings)} pomiarów wykazała {trend_desc}. "
+                f"Zmiana między pierwszym a drugim okresem wynosi {change_pct:.2f}% "
+                f"(średnia z pierwszego okresu: {first_avg:.2f}, drugiego: {second_avg:.2f}). "
+                f"Kierunek trendu: {direction}."
+            )
         
         try:
             print(f"Creating TRENDS analysis with title='Trend Analysis' ({len('Trend Analysis')} chars)")
@@ -340,7 +360,22 @@ class ReportManager:
                 peak_result['summary'] = f"Analiza szczytów obciążenia. Maksymalna wartość: {peak_result.get('peak_value', 'N/A')}, średnia: {peak_result.get('average_value', 'N/A'):.2f}."
         else:
             print("ℹ PEAK: używam statycznego podsumowania")
-            peak_result['summary'] = f"Analiza szczytów obciążenia. Maksymalna wartość: {peak_result.get('peak_value', 'N/A')}, średnia: {peak_result.get('average_value', 'N/A'):.2f}."
+            peak_value = peak_result.get('peak_value', 0)
+            avg_value = peak_result.get('average_value', 0)
+            peak_time = peak_result.get('peak_timestamp', 'N/A')
+            
+            if avg_value > 0:
+                peak_percent = ((peak_value / avg_value - 1) * 100)
+                peak_result['summary'] = (
+                    f"Analiza szczytów obciążenia wykryła maksymalną wartość {peak_value:.2f} "
+                    f"w czasie: {peak_time}. Średnia wartość wynosi {avg_value:.2f}. "
+                    f"Szczyt stanowi {peak_percent:.2f}% powyżej średniej."
+                )
+            else:
+                peak_result['summary'] = (
+                    f"Analiza szczytów obciążenia. Maksymalna wartość: {peak_value:.2f}, "
+                    f"średnia: {avg_value:.2f}."
+                )
         
         peak_analysis = Analysis.objects.create(
             analysis_type=Analysis.AnalysisType.PEAK,
@@ -419,7 +454,23 @@ class ReportManager:
         else:
             print("ℹ ANOMALY: używam statycznego podsumowania")
             anomaly_count = len(anomaly_result.get('anomalies', []))
-            anomaly_result['summary'] = f"Wykryto {anomaly_count} anomalii w {len(readings)} pomiarach. Metoda detekcji: IQR (Interquartile Range)."
+            threshold = anomaly_result.get('threshold', 'N/A')
+            method = anomaly_result.get('method', 'IQR')
+            
+            if anomaly_count > 0:
+                anomaly_result['summary'] = (
+                    f"Wykryto {anomaly_count} anomalii w {len(readings)} pomiarach "
+                    f"metodą {method}. Próg detekcji: {threshold}. "
+                    f"Anomalie mogą wskazywać na nietypowe warunki operacyjne, "
+                    f"błędy w pomiarach lub potencjalne problemy z urządzeniami. "
+                    f"Zalecana szczegółowa weryfikacja wykrytych odchyleń."
+                )
+            else:
+                anomaly_result['summary'] = (
+                    f"Nie wykryto anomalii w {len(readings)} pomiarach. "
+                    f"Wszystkie odczyty mieszczą się w normalnym zakresie zgodnie "
+                    f"z metodą detekcji {method}. System działa w przewidywalny sposób."
+                )
         
         # Utwórz nową analizę anomalii z wynikami obliczeń
         # Ustaw has_anomaly na True jeśli wykryto co najmniej jedną anomalię
@@ -1925,6 +1976,83 @@ class ReportViewSet(viewsets.ModelViewSet):
                 {"error": f"Błąd podczas pobierania pliku PDF: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+# ============================================================================
+#                           HELPER VIEWS
+# ============================================================================
+
+class DeviceMetadataView(APIView):
+    """
+    Helper endpoint: Zwraca unikalne wartości lokalizacji i typów urządzeń z bazy danych
+    Używane do wypełniania list rozwijanych w formularzu generowania raportów
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """
+        GET /analysis-reporting/metadata/
+        Zwraca:
+        {
+            "locations": ["Lab", "Building A", ...],
+            "device_types": ["energy_meter", "sensor", ...]
+        }
+        """
+        # Pobierz unikalne lokalizacje (nie puste)
+        locations = DeviceReading.objects.exclude(
+            location__isnull=True
+        ).exclude(
+            location=''
+        ).values_list('location', flat=True).distinct().order_by('location')
+        
+        # Pobierz unikalne typy urządzeń (nie puste)
+        device_types = DeviceReading.objects.exclude(
+            device_type__isnull=True
+        ).exclude(
+            device_type=''
+        ).values_list('device_type', flat=True).distinct().order_by('device_type')
+        
+        return Response({
+            'locations': list(locations),
+            'device_types': list(device_types)
+        })
+
+
+class AvailableDatesView(APIView):
+    """
+    Helper endpoint: Zwraca dostępne daty z danymi dla wybranych kryteriów
+    Używane do podświetlania dni w kalendarzu
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        """
+        GET /analysis-reporting/available-dates/?location=Lab&device_type=energy_meter
+        Zwraca:
+        {
+            "dates": ["2025-10-01", "2025-10-02", "2025-10-03", ...]
+        }
+        """
+        location = request.query_params.get('location')
+        device_type = request.query_params.get('device_type')
+        
+        # Zbuduj query z filtrami
+        queryset = DeviceReading.objects.all()
+        
+        if location:
+            queryset = queryset.filter(location=location)
+        if device_type:
+            queryset = queryset.filter(device_type=device_type)
+        
+        # Pobierz unikalne daty (bez godzin)
+        timestamps = queryset.values_list('timestamp', flat=True).distinct()
+        unique_dates = sorted(set(ts.date().isoformat() for ts in timestamps if ts))
+        
+        return Response({
+            'dates': unique_dates
+        })
     
     @action(detail=False, methods=['get'])
     def by_user(self, request):
