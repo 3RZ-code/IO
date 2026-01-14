@@ -14,6 +14,7 @@ import UserProfilePage from "./pages/UserProfilePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import OptimizationPage from "./pages/OptimizationPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -38,6 +39,7 @@ function App() {
           <Route path="/" element={<MainPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/optimization" element={<OptimizationPage />} />
         </Route>
 
         {/* Fallback */}

@@ -141,6 +141,11 @@ function MainPage() {
               <Paper
                 elevation={4}
                 className="module-square"
+                onClick={() => {
+                  if (mod.name === "Optimization & Control") {
+                    navigate("/optimization");
+                  }
+                }}
                 sx={{
                   aspectRatio: "1/1",
                   width: "300px",
@@ -153,6 +158,7 @@ function MainPage() {
                   minHeight: 0,
                   textAlign: "center",
                   transition: "transform 0.2s, box-shadow 0.2s",
+                  cursor: mod.name === "Optimization & Control" ? "pointer" : "default",
                   "&:hover": {
                     transform: "translateY(-5px) scale(1.03)",
                     boxShadow: "0 8px 24px rgba(33, 150, 243, 0.18)",

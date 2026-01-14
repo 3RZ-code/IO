@@ -1,0 +1,72 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "6543:6543"
+    environment:
+      - BACKEND_SECRET_KEY=${BACKEND_SECRET_KEY}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+    volumes:
+      - ./backend/alarm_alert/migrations:/app/alarm_alert/migrations
+      - ./backend/analysis_reporting/migrations:/app/analysis_reporting/migrations
+      - ./backend/communication/migrations:/app/communication/migrations
+      - ./backend/data_acquisition/migrations:/app/data_acquisition/migrations
+      - ./backend/forecasting/migrations:/app/forecasting/migrations
+      - ./backend/optimization_control/migrations:/app/optimization_control/migrations
+      - ./backend/security/migrations:/app/security/migrations
+      - ./backend/simulation/migrations:/app/simulation/migrations
+      - ./backend/media:/app/media
+    depends_on:
+      db_v17:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - app-network
+    environment:
+      - REACT_APP_API_URL=http://api:6543
+
+  db_v17:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_v17_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+volumes:
+  postgres_v17_data:
+
+networks:
+  app-network:
+    driver: bridge
