@@ -14,6 +14,8 @@ import UserProfilePage from "./pages/UserProfilePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import AlertsPage from "./pages/AlertsPage";
+import NotificationPreferencesPage from "./pages/NotificationPreferencesPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -38,6 +40,8 @@ function App() {
           <Route path="/" element={<MainPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/notification-preferences" element={<NotificationPreferencesPage />} />
         </Route>
 
         {/* Fallback */}
