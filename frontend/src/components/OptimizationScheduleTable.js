@@ -54,11 +54,13 @@ export const OptimizationScheduleTable = ({ schedules }) => {
           </thead>
           <tbody>
             {schedule.map((item, idx) => {
-              const startTime = new Date(item.start).toLocaleTimeString('pl-PL', {
+              const startDateTime = new Date(item.start);
+              const endDateTime = new Date(item.end);
+              const startTime = startDateTime.toLocaleTimeString('pl-PL', {
                 hour: '2-digit',
                 minute: '2-digit',
               });
-              const endTime = new Date(item.end).toLocaleTimeString('pl-PL', {
+              const endTime = endDateTime.toLocaleTimeString('pl-PL', {
                 hour: '2-digit',
                 minute: '2-digit',
               });

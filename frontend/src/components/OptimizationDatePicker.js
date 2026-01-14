@@ -28,6 +28,8 @@ export const OptimizationDatePicker = ({ onSubmit, isLoading }) => {
       }
 
       onSubmit(startDate, endDate);
+      setStartDate('');
+      setEndDate('');
     } else {
       onSubmit(null, null);
     }
