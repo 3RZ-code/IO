@@ -32,6 +32,33 @@ services:
       db_v17:
         condition: service_healthy
 
+  periodic_notifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: []
+    command: >
+      sh -c "
+        while ! pg_isready -h db_v17 -p 5432 -U $$POSTGRES_USER -d $$POSTGRES_DB; do
+          sleep 1;
+        done;
+        while true; do
+          python manage.py send_periodic_notifications;
+          sleep 60;
+        done
+      "
+    environment:
+      - BACKEND_SECRET_KEY=${BACKEND_SECRET_KEY}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+    depends_on:
+      db_v17:
+        condition: service_healthy
+    restart: unless-stopped
+
   db_v17:
     image: postgres:17-alpine
     environment:
@@ -39,7 +66,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_v17_data:/var/lib/postgresql/data
     healthcheck:

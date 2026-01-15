@@ -44,20 +44,25 @@ class AlertViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     def perform_create(self, serializer):
+        """
+        Tworzy nowy alert. Ustawia właściciela jeśli nie podano.
+        Powiadomienia są obsługiwane automatycznie przez signals.py.
+        """
         if 'user' not in serializer.validated_data or serializer.validated_data.get('user') is None:
             alert = serializer.save(user=self.request.user)
         else:
             alert = serializer.save()
-        
-        if alert.user:
-            self._create_notification_for_alert(alert)
+        # Powiadomienia tworzy signals.handle_alert_notifications automatycznie
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
+        """
+        Potwierdza alert (zmienia status na CONFIRMED).
+        Powiadomienia o potwierdzeniu są obsługiwane przez signals.py.
+        """
         alert = self.get_object()
         alert.confirmAlert()
-        
-        self._send_confirmation_notifications(alert, request.user)
+        # Powiadomienia tworzy signals.handle_confirmation_notifications automatycznie
         
         serializer = self.get_serializer(alert)
         return Response(serializer.data)
@@ -122,37 +127,6 @@ class AlertViewSet(viewsets.ModelViewSet):
         for user in recipients:
             preferences = NotificationPreferences.objects.filter(user=user).first()
             
-            if preferences and not preferences.is_active:
-                continue
-            
-            if preferences and preferences.quiet_hours_start and preferences.quiet_hours_end:
-                if preferences.quiet_hours_start <= current_time <= preferences.quiet_hours_end:
-                    continue  
-            
-            Notification.objects.create(
-                user=user,
-                alert=alert,
-                message=f"Alert '{alert.title}' został potwierdzony przez {confirmed_by.username}.",
-                sent_at=timezone.now()
-            )
-
-    def _create_notification_for_alert(self, alert):
-        preferences = NotificationPreferences.objects.filter(user=alert.user).first()
-        
-        if preferences and not preferences.is_active:
-            return
-        
-        if preferences and preferences.quiet_hours_start and preferences.quiet_hours_end:
-            current_time = timezone.now().time()
-            if preferences.quiet_hours_start <= current_time <= preferences.quiet_hours_end:
-                return
-        
-        Notification.objects.create(
-            user=alert.user,
-            alert=alert,
-            message=f"[{alert.severity}] {alert.title}: {alert.description}"
-        )
-
 
 class NotificationViewSet(viewsets.ModelViewSet):
     queryset = Notification.objects.all()
@@ -162,10 +136,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         
-        if hasattr(user, 'role') and user.role == 'admin':
-            queryset = Notification.objects.all()
-        else:
-            queryset = Notification.objects.filter(user=user)
+        queryset = Notification.objects.filter(user=user)
         
         is_read = self.request.query_params.get('is_read')
         if is_read is not None:

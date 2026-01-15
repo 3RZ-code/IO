@@ -7,3 +7,4 @@ class AlarmAlertConfig(AppConfig):
     
     def ready(self):
         import alarm_alert.signals
+        import alarm_alert.monitoring  # Ładuje sygnały monitorujące data_acquisition

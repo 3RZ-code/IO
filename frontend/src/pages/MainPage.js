@@ -8,6 +8,7 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import SettingsIcon from "@mui/icons-material/Settings";
 import Container from "@mui/material/Container";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
@@ -19,6 +20,7 @@ import TimelineIcon from "@mui/icons-material/Timeline";
 import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
 import SecurityIcon from "@mui/icons-material/Security";
 import ScienceIcon from "@mui/icons-material/Science";
+import NotificationBell from "../components/NotificationBell";
 import api from "../api/axios";
 
 const modules = [
@@ -103,11 +105,29 @@ function MainPage() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Smart System Platform
           </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/alerts")}
+            sx={{ mr: 1 }}
+            title="Alerty"
+          >
+            <AlarmIcon />
+          </IconButton>
+          <NotificationBell />
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/notification-preferences")}
+            sx={{ mr: 1 }}
+            title="Ustawienia powiadomień"
+          >
+            <SettingsIcon />
+          </IconButton>
           {isAdmin && (
             <IconButton
               color="inherit"
               onClick={() => navigate("/admin")}
               sx={{ mr: 1 }}
+              title="Panel administratora"
             >
               <AdminPanelSettingsIcon />
             </IconButton>
@@ -116,6 +136,7 @@ function MainPage() {
             color="inherit"
             onClick={() => navigate("/profile")}
             sx={{ mr: 2 }}
+            title="Profil"
           >
             <AccountCircleIcon />
           </IconButton>

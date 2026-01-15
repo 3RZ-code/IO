@@ -15,6 +15,8 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import CommunicationPage from "./pages/CommunicationPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import AlertsPage from "./pages/AlertsPage";
+import NotificationPreferencesPage from "./pages/NotificationPreferencesPage";
 import AnalysisReportingPage from "./pages/analysisReporting";
 import ReportDetailsPage from "./pages/analysisReporting/ReportDetailsPage";
 import ComparisonDetailsPage from "./pages/analysisReporting/ComparisonDetailsPage";
@@ -42,6 +44,8 @@ function App() {
           <Route path="/" element={<MainPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/notification-preferences" element={<NotificationPreferencesPage />} />
           <Route path="/communication" element={<CommunicationPage />} />
           <Route
             path="/analysis-reporting"
