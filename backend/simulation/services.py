@@ -8,9 +8,13 @@ from urllib import request
 from django.utils import timezone
 
 from .models import SimDevice, GenerationHistory, BatteryState, BatteryLog
+from .weather_sim import weather_connection
 
 
 LODZ_COORDS = {"lat": 51.7687323, "lon": 19.4569911, "label": "Lodz"}
+
+PV_SYNTHETIC_COEFF = 0.1
+WIND_SYNTHETIC_COEFF = 0.1
 
 
 class WeatherConnection:
@@ -119,7 +123,7 @@ def _generation_from_weather(weather: Dict[str, Any]) -> Dict[str, Decimal]:
     temp_c = weather.get("main", {}).get("temp")
     wind_speed = float(weather.get("wind", {}).get("speed", 0.0))
     cloudiness = float(weather.get("clouds", {}).get("all", 0.0))
-    irradiance = _estimate_irradiance(cloudiness, is_day)
+    irradiance = float(weather.get("solar_irradiance_wm2")) if weather.get("solar_irradiance_wm2") is not None else _estimate_irradiance(cloudiness, is_day)
 
     devices = SimDevice.objects.filter(status=SimDevice.Status.ACTIVE)
     pv_total = 0.0
@@ -154,7 +158,7 @@ def simulate_generation_from_weather(weather: Dict[str, Any]) -> GenerationHisto
     temp_c = weather.get("main", {}).get("temp")
     wind_speed = float(weather.get("wind", {}).get("speed", 0.0))
     cloudiness = float(weather.get("clouds", {}).get("all", 0.0))
-    irradiance = _estimate_irradiance(cloudiness, is_day)
+    irradiance = float(weather.get("solar_irradiance_wm2")) if weather.get("solar_irradiance_wm2") is not None else _estimate_irradiance(cloudiness, is_day)
 
     devices = SimDevice.objects.filter(status=SimDevice.Status.ACTIVE)
     pv_total = 0.0
@@ -182,6 +186,89 @@ def simulate_generation_from_weather(weather: Dict[str, Any]) -> GenerationHisto
         wind_generation_kw=_quantize(wind_total, "0.001"),
         total_generation_kw=_quantize(total_kw, "0.001"),
         weather_payload=weather,
+    )
+
+    return entry
+
+
+def fetch_real_weather_now() -> Dict[str, Any]:
+    """
+    Pobiera bieżące dane pogodowe z weather_sim (Open-Meteo) i mapuje je do formatu symulacji.
+    Jeśli nie da się pobrać danych, zwraca mockowane.
+    """
+    now_ts = int(timezone.now().timestamp())
+    conn = weather_connection()
+    conn.connect()
+    if conn.stats.get("error") is not None:
+        return generate_mock_weather(now_ts)
+
+    daily = conn.stats.get("daily", {})
+    times = daily.get("time", [])
+    temps_mean = daily.get("temperature_2m_mean", [])
+    wind_speeds = daily.get("wind_speed_10m_max", [])
+    radiation = daily.get("shortwave_radiation_sum", [])
+
+    target_date = datetime.fromtimestamp(now_ts, tz=timezone.get_current_timezone()).date().isoformat()
+    if target_date in times:
+        idx = times.index(target_date)
+    else:
+        idx = 0
+
+    temp = temps_mean[idx] if idx < len(temps_mean) else 15.0
+    wind = wind_speeds[idx] if idx < len(wind_speeds) else 5.0
+    rad = radiation[idx] if idx < len(radiation) else 10.0
+
+    cloudiness = _convert_radiation_to_cloudiness(rad)
+    irradiance_wm2 = (float(rad) * 1_000_000.0) / 86400.0  # MJ/m2/day -> W/m2 avg
+
+    return {
+        "dt": now_ts,
+        "sys": {"sunrise": None, "sunset": None},
+        "main": {"temp": float(temp)},
+        "wind": {"speed": float(wind)},
+        "clouds": {"all": float(cloudiness)},
+        "solar_irradiance_wm2": float(irradiance_wm2),
+        "source": "real",
+    }
+
+
+def simulate_generation_from_levels(sun_level: int, wind_level: int) -> GenerationHistory:
+    """
+    Symulacja syntetyczna na podstawie skali 1-10 dla słońca i wiatru.
+    """
+    sun_level = max(1, min(10, int(sun_level)))
+    wind_level = max(1, min(10, int(wind_level)))
+
+    devices = SimDevice.objects.filter(status=SimDevice.Status.ACTIVE)
+    pv_total = 0.0
+    wind_total = 0.0
+
+    for device in devices:
+        if device.type_code == SimDevice.TypeCode.PV:
+            pv_total += float(device.pv_kwp or 0) * sun_level * PV_SYNTHETIC_COEFF
+        elif device.type_code == SimDevice.TypeCode.WIND:
+            wind_total += float(device.wind_rated_kw or 0) * wind_level * WIND_SYNTHETIC_COEFF
+
+    total_kw = pv_total + wind_total
+    now_ts = int(timezone.now().timestamp())
+    timestamp = timezone.datetime.fromtimestamp(now_ts, tz=timezone.utc)
+    timestamp = timestamp.astimezone(timezone.get_current_timezone())
+
+    entry = GenerationHistory.objects.create(
+        timestamp=timestamp,
+        location=LODZ_COORDS["label"],
+        temperature_c=None,
+        wind_speed_ms=_quantize(wind_level, "0.01"),
+        cloudiness_pct=int((10 - sun_level) * 10),
+        solar_irradiance_wm2=_quantize((sun_level / 10.0) * 1000.0, "0.01"),
+        pv_generation_kw=_quantize(pv_total, "0.001"),
+        wind_generation_kw=_quantize(wind_total, "0.001"),
+        total_generation_kw=_quantize(total_kw, "0.001"),
+        weather_payload={
+            "source": "synthetic",
+            "sun_level": sun_level,
+            "wind_level": wind_level,
+        },
     )
 
     return entry
