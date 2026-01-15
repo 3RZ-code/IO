@@ -26,13 +26,13 @@ const modules = [
     name: "Alarm & Alert",
     icon: <AlarmIcon fontSize="large" color="primary" />,
     desc: "Real-time alarm notifications and alert handling.",
-    path: null,
+    path: "null",
   },
   {
     name: "Analysis & Reporting",
     icon: <AssessmentIcon fontSize="large" color="primary" />,
     desc: "In-depth data analysis and reporting tools.",
-    path: null,
+    path: "/analysis-reporting",
   },
   {
     name: "Communication",
