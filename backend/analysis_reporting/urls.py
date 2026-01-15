@@ -11,5 +11,7 @@ router.register(r'comparisons', views.ReportCompareViewSet, basename='comparison
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('metadata/', views.DeviceMetadataView.as_view(), name='device-metadata'),
+    path('available-dates/', views.AvailableDatesView.as_view(), name='available-dates'),
     path('', include(router.urls)),
 ]

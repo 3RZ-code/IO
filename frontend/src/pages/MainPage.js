@@ -26,13 +26,13 @@ const modules = [
     name: "Alarm & Alert",
     icon: <AlarmIcon fontSize="large" color="primary" />,
     desc: "Real-time alarm notifications and alert handling.",
-    path: null,
+    path: "null",
   },
   {
     name: "Analysis & Reporting",
     icon: <AssessmentIcon fontSize="large" color="primary" />,
     desc: "In-depth data analysis and reporting tools.",
-    path: null,
+    path: "/analysis-reporting",
   },
   {
     name: "Communication",
@@ -149,6 +149,11 @@ function MainPage() {
               <Paper
                 elevation={4}
                 className="module-square"
+                onClick={() => {
+                  if (mod.name === "Analysis & Reporting") {
+                    navigate("/analysis-reporting");
+                  }
+                }}
                 sx={{
                   aspectRatio: "1/1",
                   width: "300px",
@@ -160,6 +165,8 @@ function MainPage() {
                   minWidth: 0,
                   minHeight: 0,
                   textAlign: "center",
+                  cursor:
+                    mod.name === "Analysis & Reporting" ? "pointer" : "default",
                   transition: "transform 0.2s, box-shadow 0.2s",
                   cursor: mod.path ? "pointer" : "default",
                   "&:hover": {
