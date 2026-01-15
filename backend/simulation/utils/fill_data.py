@@ -30,7 +30,6 @@ def fill_sim_devices(apps, schema_editor):
                 power_kw=(row['power_kw'] or None),
                 pv_kwp=(row['pv_kwp'] or None),
                 wind_rated_kw=(row['wind_rated_kw'] or None),
-                hp_t_in_set_c=(row['hp_t_in_set_c'] or None),
                 note=row.get('note') or ''
             ))
 
