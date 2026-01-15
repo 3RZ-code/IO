@@ -202,24 +202,50 @@ def fetch_real_weather_now() -> Dict[str, Any]:
     if conn.stats.get("error") is not None:
         return generate_mock_weather(now_ts)
 
-    daily = conn.stats.get("daily", {})
-    times = daily.get("time", [])
-    temps_mean = daily.get("temperature_2m_mean", [])
-    wind_speeds = daily.get("wind_speed_10m_max", [])
-    radiation = daily.get("shortwave_radiation_sum", [])
+    hourly = conn.stats.get("hourly", {})
+    times = hourly.get("time", [])
+    temps = hourly.get("temperature_2m", [])
+    wind_speeds = hourly.get("wind_speed_10m", [])
+    cloud_cover = hourly.get("cloud_cover", [])
+    radiation = hourly.get("shortwave_radiation", [])
 
-    target_date = datetime.fromtimestamp(now_ts, tz=timezone.get_current_timezone()).date().isoformat()
-    if target_date in times:
-        idx = times.index(target_date)
+    now_local = timezone.localtime(timezone.now())
+    target_time = now_local.replace(minute=0, second=0, microsecond=0)
+    candidate_times = [
+        target_time.strftime("%Y-%m-%dT%H:00"),
+        target_time.isoformat(timespec="minutes"),
+    ]
+
+    idx = None
+    for candidate in candidate_times:
+        if candidate in times:
+            idx = times.index(candidate)
+            break
+
+    if idx is not None:
+        temp = temps[idx] if idx < len(temps) else 15.0
+        wind = wind_speeds[idx] if idx < len(wind_speeds) else 5.0
+        cloudiness = cloud_cover[idx] if idx < len(cloud_cover) else 50.0
+        irradiance_wm2 = radiation[idx] if idx < len(radiation) else 0.0
     else:
-        idx = 0
+        daily = conn.stats.get("daily", {})
+        d_times = daily.get("time", [])
+        temps_mean = daily.get("temperature_2m_mean", [])
+        wind_max = daily.get("wind_speed_10m_max", [])
+        rad_sum = daily.get("shortwave_radiation_sum", [])
 
-    temp = temps_mean[idx] if idx < len(temps_mean) else 15.0
-    wind = wind_speeds[idx] if idx < len(wind_speeds) else 5.0
-    rad = radiation[idx] if idx < len(radiation) else 10.0
+        target_date = now_local.date().isoformat()
+        if target_date in d_times:
+            idx = d_times.index(target_date)
+        else:
+            idx = 0
 
-    cloudiness = _convert_radiation_to_cloudiness(rad)
-    irradiance_wm2 = (float(rad) * 1_000_000.0) / 86400.0  # MJ/m2/day -> W/m2 avg
+        temp = temps_mean[idx] if idx < len(temps_mean) else 15.0
+        wind = wind_max[idx] if idx < len(wind_max) else 5.0
+        rad = rad_sum[idx] if idx < len(rad_sum) else 10.0
+
+        cloudiness = _convert_radiation_to_cloudiness(rad)
+        irradiance_wm2 = (float(rad) * 1_000_000.0) / 86400.0  # MJ/m2/day -> W/m2 avg
 
     return {
         "dt": now_ts,

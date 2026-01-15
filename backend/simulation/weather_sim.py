@@ -9,7 +9,14 @@ class weather_connection:
         self.stats = {}
 
     def connect(self):
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={LATITUDE}&longitude={LONGITUDE}&daily=wind_speed_10m_max,shortwave_radiation_sum,temperature_2m_max,temperature_2m_min,temperature_2m_mean&hourly=temperature_2m"
+        url = (
+            f"https://api.open-meteo.com/v1/forecast?"
+            f"latitude={LATITUDE}&longitude={LONGITUDE}&"
+            f"daily=wind_speed_10m_max,shortwave_radiation_sum,temperature_2m_max,"
+            f"temperature_2m_min,temperature_2m_mean&"
+            f"hourly=temperature_2m,wind_speed_10m,cloud_cover,shortwave_radiation&"
+            f"timezone=Europe/Warsaw"
+        )
         try:
             with request.urlopen(url) as response:
                 if response.status != 200:
