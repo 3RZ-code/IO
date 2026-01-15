@@ -12,6 +12,7 @@ import DifficultLoginPage from "./pages/DifficultLoginPage";
 import MainPage from "./pages/MainPage";
 import UserProfilePage from "./pages/UserProfilePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import CommunicationPage from "./pages/CommunicationPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import AnalysisReportingPage from "./pages/analysisReporting";
@@ -41,6 +42,7 @@ function App() {
           <Route path="/" element={<MainPage />} />
           <Route path="/profile" element={<UserProfilePage />} />
           <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/communication" element={<CommunicationPage />} />
           <Route
             path="/analysis-reporting"
             element={<AnalysisReportingPage />}
