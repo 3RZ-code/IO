@@ -28,41 +28,49 @@ const modules = [
     name: "Alarm & Alert",
     icon: <AlarmIcon fontSize="large" color="primary" />,
     desc: "Real-time alarm notifications and alert handling.",
+    path: "null",
   },
   {
     name: "Analysis & Reporting",
     icon: <AssessmentIcon fontSize="large" color="primary" />,
     desc: "In-depth data analysis and reporting tools.",
+    path: "/analysis-reporting",
   },
   {
     name: "Communication",
     icon: <ForumIcon fontSize="large" color="primary" />,
     desc: "Reliable communication between system modules.",
+    path: "/communication",
   },
   {
     name: "Data Acquisition",
     icon: <StorageIcon fontSize="large" color="primary" />,
     desc: "Efficient data collection from multiple sources.",
+    path: null,
   },
   {
     name: "Forecasting",
     icon: <TimelineIcon fontSize="large" color="primary" />,
     desc: "Predictive analytics and trend forecasting.",
+    path: null,
   },
   {
     name: "Optimization & Control",
     icon: <SettingsSuggestIcon fontSize="large" color="primary" />,
     desc: "Smart optimization and advanced control systems.",
+    path: null,
   },
   {
     name: "Security",
     icon: <SecurityIcon fontSize="large" color="primary" />,
     desc: "Comprehensive security and access management.",
+    path: null,
   },
   {
     name: "Simulation",
     icon: <ScienceIcon fontSize="large" color="primary" />,
     desc: "Modeling and simulation of system scenarios.",
+    path: null,
   },
 ];
 
@@ -162,6 +170,11 @@ function MainPage() {
               <Paper
                 elevation={4}
                 className="module-square"
+                onClick={() => {
+                  if (mod.name === "Analysis & Reporting") {
+                    navigate("/analysis-reporting");
+                  }
+                }}
                 sx={{
                   aspectRatio: "1/1",
                   width: "300px",
@@ -173,12 +186,18 @@ function MainPage() {
                   minWidth: 0,
                   minHeight: 0,
                   textAlign: "center",
+                  cursor:
+                    mod.name === "Analysis & Reporting" ? "pointer" : "default",
                   transition: "transform 0.2s, box-shadow 0.2s",
+                  cursor: mod.path ? "pointer" : "default",
                   "&:hover": {
-                    transform: "translateY(-5px) scale(1.03)",
-                    boxShadow: "0 8px 24px rgba(33, 150, 243, 0.18)",
+                    transform: mod.path ? "translateY(-5px) scale(1.03)" : "none",
+                    boxShadow: mod.path
+                      ? "0 8px 24px rgba(33, 150, 243, 0.18)"
+                      : "0 4px 6px rgba(0, 0, 0, 0.1)",
                   },
                 }}
+                onClick={() => mod.path && navigate(mod.path)}
               >
                 {mod.icon}
                 <Typography variant="h6" sx={{ mt: 2 }}>

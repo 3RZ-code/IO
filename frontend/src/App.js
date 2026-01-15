@@ -12,10 +12,14 @@ import DifficultLoginPage from "./pages/DifficultLoginPage";
 import MainPage from "./pages/MainPage";
 import UserProfilePage from "./pages/UserProfilePage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
+import CommunicationPage from "./pages/CommunicationPage";
 import TermsOfServicePage from "./pages/TermsOfServicePage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import AlertsPage from "./pages/AlertsPage";
 import NotificationPreferencesPage from "./pages/NotificationPreferencesPage";
+import AnalysisReportingPage from "./pages/analysisReporting";
+import ReportDetailsPage from "./pages/analysisReporting/ReportDetailsPage";
+import ComparisonDetailsPage from "./pages/analysisReporting/ComparisonDetailsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -42,6 +46,19 @@ function App() {
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/alerts" element={<AlertsPage />} />
           <Route path="/notification-preferences" element={<NotificationPreferencesPage />} />
+          <Route path="/communication" element={<CommunicationPage />} />
+          <Route
+            path="/analysis-reporting"
+            element={<AnalysisReportingPage />}
+          />
+          <Route
+            path="/analysis-reporting/report/:reportId"
+            element={<ReportDetailsPage />}
+          />
+          <Route
+            path="/analysis-reporting/comparison/:comparisonId"
+            element={<ComparisonDetailsPage />}
+          />
         </Route>
 
         {/* Fallback */}
