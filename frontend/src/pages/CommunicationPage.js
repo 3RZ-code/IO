@@ -67,6 +67,13 @@ function CommunicationPage() {
     working_status: false,
   });
 
+  // Filter state
+  const [filterType, setFilterType] = useState("all");
+  const [filterDevice, setFilterDevice] = useState("");
+  const [filterUser, setFilterUser] = useState("");
+  const [filterDateStart, setFilterDateStart] = useState("");
+  const [filterDateEnd, setFilterDateEnd] = useState("");
+
   useEffect(() => {
     fetchData();
     checkAdmin();
@@ -86,8 +93,19 @@ function CommunicationPage() {
     setLoading(true);
     setError("");
     try {
+      let schedulesUrl = "/communication/schedules/";
+      
+      // Apply filters based on selected filter type
+      if (filterType === "active") {
+        schedulesUrl = "/communication/schedules/active/";
+      } else if (filterType === "by_device" && filterDevice) {
+        schedulesUrl = `/communication/schedules/by_device/?device_id=${filterDevice}`;
+      } else if (filterType === "by_date_range" && filterDateStart && filterDateEnd) {
+        schedulesUrl = `/communication/schedules/by_date_range/?start=${filterDateStart}&end=${filterDateEnd}`;
+      }
+
       const [schedulesRes, devicesRes] = await Promise.all([
-        api.get("/communication/schedules/"),
+        api.get(schedulesUrl),
         api.get("/data-acquisition/devices/"),
       ]);
       setSchedules(schedulesRes.data);
@@ -255,6 +273,28 @@ function CommunicationPage() {
     navigate("/login");
   };
 
+  const handleFilterChange = (type) => {
+    setFilterType(type);
+    // Reset filter values
+    setFilterDevice("");
+    setFilterUser("");
+    setFilterDateStart("");
+    setFilterDateEnd("");
+  };
+
+  const handleApplyFilter = () => {
+    fetchData();
+  };
+
+  const handleClearFilters = () => {
+    setFilterType("all");
+    setFilterDevice("");
+    setFilterUser("");
+    setFilterDateStart("");
+    setFilterDateEnd("");
+    fetchData();
+  };
+
   const getDeviceName = (deviceId) => {
     const device = devices.find((d) => d.device_id === deviceId);
     return device ? device.name : `Device ${deviceId}`;
@@ -381,6 +421,97 @@ function CommunicationPage() {
                 </Card>
               </Grid>
             </Grid>
+
+            {/* Filters */}
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Filter Schedules
+                </Typography>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} md={3}>
+                    <FormControl fullWidth>
+                      <InputLabel>Filter Type</InputLabel>
+                      <Select
+                        value={filterType}
+                        label="Filter Type"
+                        onChange={(e) => handleFilterChange(e.target.value)}
+                      >
+                        <MenuItem value="all">All Schedules</MenuItem>
+                        <MenuItem value="active">Active Only</MenuItem>
+                        <MenuItem value="by_device">By Device</MenuItem>
+                        <MenuItem value="by_date_range">By Date Range</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  {filterType === "by_device" && (
+                    <Grid item xs={12} md={3}>
+                      <FormControl fullWidth>
+                        <InputLabel>Device</InputLabel>
+                        <Select
+                          value={filterDevice}
+                          label="Device"
+                          onChange={(e) => setFilterDevice(e.target.value)}
+                        >
+                          {devices.map((device) => (
+                            <MenuItem key={device.device_id} value={device.device_id}>
+                              {device.name} (ID: {device.device_id})
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  )}
+
+                  {filterType === "by_date_range" && (
+                    <>
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          fullWidth
+                          label="Start Date"
+                          type="date"
+                          value={filterDateStart}
+                          onChange={(e) => setFilterDateStart(e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={3}>
+                        <TextField
+                          fullWidth
+                          label="End Date"
+                          type="date"
+                          value={filterDateEnd}
+                          onChange={(e) => setFilterDateEnd(e.target.value)}
+                          InputLabelProps={{ shrink: true }}
+                        />
+                      </Grid>
+                    </>
+                  )}
+
+                  <Grid item xs={12} md={filterType === "all" || filterType === "active" ? 9 : 3}>
+                    <Stack direction="row" spacing={2}>
+                      <Button
+                        variant="contained"
+                        onClick={handleApplyFilter}
+                        disabled={
+                          (filterType === "by_device" && !filterDevice) ||
+                          (filterType === "by_date_range" && (!filterDateStart || !filterDateEnd))
+                        }
+                      >
+                        Apply Filter
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        onClick={handleClearFilters}
+                      >
+                        Clear Filters
+                      </Button>
+                    </Stack>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
 
             {/* Schedules Table */}
             {loading ? (
