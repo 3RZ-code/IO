@@ -58,7 +58,7 @@ const modules = [
     name: "Optimization & Control",
     icon: <SettingsSuggestIcon fontSize="large" color="primary" />,
     desc: "Smart optimization and advanced control systems.",
-    path: null,
+    path: "/optimization",
   },
   {
     name: "Security",

@@ -20,6 +20,7 @@ import NotificationPreferencesPage from "./pages/NotificationPreferencesPage";
 import AnalysisReportingPage from "./pages/analysisReporting";
 import ReportDetailsPage from "./pages/analysisReporting/ReportDetailsPage";
 import ComparisonDetailsPage from "./pages/analysisReporting/ComparisonDetailsPage";
+import OptimizationPage from "./pages/OptimizationPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./App.css";
 
@@ -59,6 +60,7 @@ function App() {
             path="/analysis-reporting/comparison/:comparisonId"
             element={<ComparisonDetailsPage />}
           />
+          <Route path="/optimization" element={<OptimizationPage />} />
         </Route>
 
         {/* Fallback */}
