@@ -207,7 +207,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     queryset = Schedule.objects.select_related('device').all()
     serializer_class = ScheduleSerializer
     permission_classes = [IsAdminOrReadOnly]
-    http_method_names = ['get', 'post', 'put', 'delete', 'head', 'options']
+    http_method_names = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options']
     
     def get_serializer_class(self):
         if self.action == 'create':
