@@ -516,14 +516,6 @@ def _log_battery(charge: Decimal, source: str):
 
 def ensure_randomized_today() -> BatteryState:
     battery = get_or_create_battery()
-    today = date.today()
-    if battery.last_randomized_date != today:
-        battery.current_charge_kwh = Decimal(str(random.uniform(0, float(battery.max_capacity_kwh)))).quantize(
-            Decimal("0.001"), rounding=ROUND_HALF_UP
-        )
-        battery.last_randomized_date = today
-        battery.save(update_fields=["current_charge_kwh", "last_randomized_date"])
-        _log_battery(battery.current_charge_kwh, "randomized")
     return battery
 
 
@@ -549,4 +541,6 @@ def adjust_battery(action: str, amount_kwh: Decimal) -> BatteryState:
     battery.save(update_fields=["current_charge_kwh"])
     _log_battery(battery.current_charge_kwh, action)
     return battery
+
+
 

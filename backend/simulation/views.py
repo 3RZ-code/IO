@@ -293,6 +293,28 @@ class BatteryView(APIView):
         data = BatteryStateSerializer(battery).data
         return Response(data)
 
+    def post(self, request):
+        action = request.data.get("action")
+        amount = request.data.get("amount_kwh")
+        if action not in ("add", "remove"):
+            return Response({"detail": "action must be 'add' or 'remove'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if amount is None:
+            return Response({"detail": "amount_kwh is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount_dec = Decimal(str(amount))
+        except Exception:
+            return Response({"detail": "amount_kwh must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount_dec < 0:
+            return Response({"detail": "amount_kwh must be non-negative."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            battery = adjust_battery(action, amount_dec)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = BatteryStateSerializer(battery).data
+        return Response(data)
+
 
 class MockWeatherRange(APIView):
     """
