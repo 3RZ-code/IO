@@ -22,6 +22,8 @@ from .services import (
     adjust_battery,
     generate_mock_weather,
     generate_mock_series,
+    fetch_real_weather_now,
+    simulate_generation_from_levels,
 )
 from .serializers import BatteryLogSerializer
 from .models import BatteryLog
@@ -48,11 +50,20 @@ class RunGenerationSimulation(APIView):
     """
 
     def post(self, request):
-        weather = generate_mock_weather()
-        try:
-            history_entry = simulate_generation_from_weather(weather)
-        except ValueError as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        sun_level = request.query_params.get("sun")
+        wind_level = request.query_params.get("wind")
+
+        if sun_level is not None and wind_level is not None:
+            try:
+                history_entry = simulate_generation_from_levels(int(sun_level), int(wind_level))
+            except Exception as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            weather = fetch_real_weather_now()
+            try:
+                history_entry = simulate_generation_from_weather(weather)
+            except ValueError as exc:
+                return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = GenerationHistorySerializer(history_entry)
         return Response(
@@ -279,6 +290,28 @@ class BatteryView(APIView):
 
     def get(self, request):
         battery = ensure_randomized_today()
+        data = BatteryStateSerializer(battery).data
+        return Response(data)
+
+    def post(self, request):
+        action = request.data.get("action")
+        amount = request.data.get("amount_kwh")
+        if action not in ("add", "remove"):
+            return Response({"detail": "action must be 'add' or 'remove'."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if amount is None:
+            return Response({"detail": "amount_kwh is required."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            amount_dec = Decimal(str(amount))
+        except Exception:
+            return Response({"detail": "amount_kwh must be a number."}, status=status.HTTP_400_BAD_REQUEST)
+        if amount_dec < 0:
+            return Response({"detail": "amount_kwh must be non-negative."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            battery = adjust_battery(action, amount_dec)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         data = BatteryStateSerializer(battery).data
         return Response(data)
 
