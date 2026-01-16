@@ -1,13 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import AppBar from '@mui/material/AppBar';
+import Box from '@mui/material/Box';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import HomeIcon from '@mui/icons-material/Home';
+import AlarmIcon from '@mui/icons-material/Alarm';
+import SettingsIcon from '@mui/icons-material/Settings';
+import SettingsSuggestIcon from '@mui/icons-material/SettingsSuggest';
+import NotificationBell from '../components/NotificationBell';
 import OptimizationDatePicker from '../components/OptimizationDatePicker';
 import OptimizationSummary from '../components/OptimizationSummary';
 import OptimizationScheduleTable from '../components/OptimizationScheduleTable';
 import { optimizationApi } from '../api/optimizationApi';
+import api from '../api/axios';
 
 const OptimizationPage = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const response = await api.get("/security/users/me/");
+        setIsAdmin(response.data.role === "admin");
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    checkAdmin();
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
 
   const handleOptimization = async (startDate, endDate) => {
     setLoading(true);
@@ -36,16 +70,72 @@ const OptimizationPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            🔋 Optymalizacja Harmonogramu Energii
-          </h1>
-          <p className="text-gray-600">
-            Zaplanuj urządzenia w optymalnych godzinach, aby minimalizować koszty energii
-          </p>
-        </div>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      <AppBar position="static">
+        <Toolbar>
+          <SettingsSuggestIcon sx={{ mr: 2 }} />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Optimization & Control
+          </Typography>
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/")}
+            sx={{ mr: 1 }}
+            title="Strona główna"
+          >
+            <HomeIcon />
+          </IconButton>
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/alerts")}
+            sx={{ mr: 1 }}
+            title="Alerty"
+          >
+            <AlarmIcon />
+          </IconButton>
+          <NotificationBell />
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/notification-preferences")}
+            sx={{ mr: 1 }}
+            title="Ustawienia powiadomień"
+          >
+            <SettingsIcon />
+          </IconButton>
+          {isAdmin && (
+            <IconButton
+              color="inherit"
+              onClick={() => navigate("/admin")}
+              sx={{ mr: 1 }}
+              title="Panel administratora"
+            >
+              <AdminPanelSettingsIcon />
+            </IconButton>
+          )}
+          <IconButton
+            color="inherit"
+            onClick={() => navigate("/profile")}
+            sx={{ mr: 2 }}
+            title="Profil"
+          >
+            <AccountCircleIcon />
+          </IconButton>
+          <Button color="inherit" onClick={handleLogout}>
+            Logout
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <div className="min-h-screen bg-gray-100 py-8 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">
+              🔋 Optymalizacja Harmonogramu Energii
+            </h1>
+            <p className="text-gray-600">
+              Zaplanuj urządzenia w optymalnych godzinach, aby minimalizować koszty energii
+            </p>
+          </div>
 
         <OptimizationDatePicker onSubmit={handleOptimization} isLoading={loading} />
 
@@ -137,7 +227,8 @@ const OptimizationPage = () => {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </Box>
   );
 };
 

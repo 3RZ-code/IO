@@ -28,7 +28,7 @@ const modules = [
     name: "Alarm & Alert",
     icon: <AlarmIcon fontSize="large" color="primary" />,
     desc: "Real-time alarm notifications and alert handling.",
-    path: "null",
+    path: "/alerts",
   },
   {
     name: "Analysis & Reporting",
