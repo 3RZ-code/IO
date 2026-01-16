@@ -3,7 +3,6 @@ admin@example.com,Critical System Alert,System temperature exceeded safe limits 
 user@example.com,High Energy Consumption,Energy consumption in sector B exceeded threshold by 25%,WARNING,NEW,energy,energy_monitor,false
 admin@example.com,PV Panel Failure,Solar panel PV01 not generating power for 3 hours,CRITICAL,NEW,energy,pv_system,false
 user@example.com,Lighting Zone Active,Lighting in zone B active with no motion detected for 2 hours,WARNING,CONFIRMED,system,lighting_system,false
-admin@example.com,Monthly Report Failed,Error processing renewable energy data for monthly report,CRITICAL,NEW,report,report_module,false
 user@example.com,Weather Warning,Strong wind forecast - HVAC load reduction recommended,INFO,NEW,weather,weather_api,false
 ,Maintenance Reminder,Regular maintenance scheduled for all devices tomorrow,INFO,NEW,maintenance,scheduler,false
 user@example.com,Battery Level Low,Backup battery system at 15% capacity,WARNING,NEW,energy,battery_monitor,false

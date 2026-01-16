@@ -66,8 +66,7 @@ def monitor_device_reading(sender, instance, created, **kwargs):
             description=f"Device {reading.device.name} (ID: {reading.device.device_id}) reported offline status",
             severity='CRITICAL',
             category='device',
-            source=f'device_{reading.device.device_id}',
-            device_id=reading.device.device_id
+            source=f'device_{reading.device.device_id}'
         )
         logger.warning(f"Device {reading.device.device_id} is offline")
     
@@ -78,8 +77,7 @@ def monitor_device_reading(sender, instance, created, **kwargs):
             description=f"Device {reading.device.name} has weak signal: {reading.signal_dbm} dBm (threshold: {MIN_SIGNAL_STRENGTH} dBm)",
             severity='WARNING',
             category='communication',
-            source=f'device_{reading.device.device_id}',
-            device_id=reading.device.device_id
+            source=f'device_{reading.device.device_id}'
         )
         logger.warning(f"Weak signal from device {reading.device.device_id}: {reading.signal_dbm} dBm")
     
@@ -94,8 +92,7 @@ def monitor_device_reading(sender, instance, created, **kwargs):
                 description=f"{reading.metric} is below threshold: {reading.value} {threshold['unit']} < {threshold['min']} {threshold['unit']}",
                 severity='WARNING',
                 category='sensor',
-                source=f'device_{reading.device.device_id}',
-                device_id=reading.device.device_id
+                source=f'device_{reading.device.device_id}'
             )
             logger.warning(f"Low {reading.metric} from device {reading.device.device_id}: {reading.value}")
         
@@ -105,8 +102,7 @@ def monitor_device_reading(sender, instance, created, **kwargs):
                 description=f"{reading.metric} is above threshold: {reading.value} {threshold['unit']} > {threshold['max']} {threshold['unit']}",
                 severity='CRITICAL' if metric_lower in ['temperature', 'co2'] else 'WARNING',
                 category='sensor',
-                source=f'device_{reading.device.device_id}',
-                device_id=reading.device.device_id
+                source=f'device_{reading.device.device_id}'
             )
             logger.warning(f"High {reading.metric} from device {reading.device.device_id}: {reading.value}")
 
@@ -140,48 +136,11 @@ def monitor_device_status_change(sender, instance, **kwargs):
                     description=f"Device {instance.name} (ID: {instance.device_id}) has been deactivated (priority: {instance.priority})",
                     severity=severity,
                     category='device',
-                    source=f'device_{instance.device_id}',
-                    device_id=instance.device_id
+                    source=f'device_{instance.device_id}'
                 )
                 logger.info(f"Device {instance.device_id} deactivated (priority: {instance.priority}, severity: {severity})")
         except Device.DoesNotExist:
             pass
-
-
-# ==================== FUNKCJE POMOCNICZE ====================
-
-def create_alert_if_not_exists(title, description, severity, category, source, user=None):
-    """
-    Tworzy alert tylko jeśli podobny alert nie istnieje już dla tego źródła.
-    Zapobiega duplikatom alertów.
-    
-    """
-    # Sprawdź czy istnieje już aktywny alert dla tego źródła i kategorii
-    recent_time = timezone.now() - timedelta(hours=1)
-    
-    existing_alert = Alert.objects.filter(
-        category=category,
-        source=source,
-        status__in=['NEW', 'CONFIRMED'],
-        created_at__gte=recent_time
-    ).first()
-    
-    if existing_alert:
-        logger.debug(f"Alert already exists for {source}, skipping creation")
-        return None
-    
-    # Utwórz nowy alert
-    alert = Alert.objects.create(
-        title=title,
-        description=description,
-        severity=severity,
-        category=category,
-        source=source,
-        user=user  # Może być None dla alertów systemowych
-    )
-    
-    logger.info(f"Created alert: {title} (severity: {severity}, user: {user.username if user else 'system'})")
-    return alert
 
 
 # ==================== MONITOROWANIE ANALYSIS & REPORTING ====================

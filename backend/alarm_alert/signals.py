@@ -153,6 +153,7 @@ def handle_confirmation_notifications(sender, instance, created, **kwargs):
 def send_confirmation_notifications(alert):
     """
     Powiadamia administratorów i właściciela o potwierdzeniu alertu.
+    Uwzględnia preferencje użytkownika (is_active, quiet_hours).
     """
     recipients = set()
     
@@ -165,13 +166,29 @@ def send_confirmation_notifications(alert):
     if alert.user:
         recipients.add(alert.user)
     
-    # Wyślij powiadomienia
+    # Wyślij powiadomienia z uwzględnieniem preferencji
+    local_tz = pytz.timezone('Europe/Warsaw')
+    current_time = timezone.now().astimezone(local_tz).time()
+    
+    notifications_sent = 0
     for user in recipients:
+        # Sprawdź preferencje użytkownika
+        preferences = NotificationPreferences.objects.filter(user=user).first()
+        
+        # Czy powiadomienia są włączone?
+        if preferences and not preferences.is_active:
+            continue
+        
+        # Czy nie jesteśmy w quiet hours?
+        if preferences and preferences.quiet_hours_start and preferences.quiet_hours_end:
+            if preferences.quiet_hours_start <= current_time <= preferences.quiet_hours_end:
+                continue
+        
         Notification.objects.create(
             user=user,
             alert=alert,
             message=f"Alert potwierdzony przez {alert.confirmed_by.username if alert.confirmed_by else 'system'}: {alert.title}"
         )
-        logger.info(f"Wysłano powiadomienie o potwierdzeniu do {user.username}")
+        notifications_sent += 1
     
-    logger.info(f"Wysłano {len(recipients)} powiadomień o potwierdzeniu alertu: {alert.title}")  
+    logger.info(f"Wysłano {notifications_sent}/{len(recipients)} powiadomień o potwierdzeniu alertu: {alert.title}")  

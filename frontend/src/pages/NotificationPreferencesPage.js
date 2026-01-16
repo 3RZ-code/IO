@@ -5,12 +5,9 @@ import {
     Box,
     Typography,
     Paper,
-    Switch,
-    FormControlLabel,
     TextField,
     Button,
     Alert,
-    Divider,
     AppBar,
     Toolbar
 } from '@mui/material';
@@ -20,7 +17,6 @@ import { getMyPreferences, updateMyPreferences } from '../api/alarmAlertService'
 function NotificationPreferencesPage() {
     const navigate = useNavigate();
     const [preferences, setPreferences] = useState({
-        is_active: true,
         quiet_hours_start: '',
         quiet_hours_end: ''
     });
@@ -37,7 +33,6 @@ function NotificationPreferencesPage() {
             setLoading(true);
             const data = await getMyPreferences();
             setPreferences({
-                is_active: data.is_active,
                 quiet_hours_start: data.quiet_hours_start || '',
                 quiet_hours_end: data.quiet_hours_end || ''
             });
@@ -50,14 +45,40 @@ function NotificationPreferencesPage() {
     };
 
     const handleSave = async () => {
+        if (!preferences.quiet_hours_start || !preferences.quiet_hours_end) {
+            setError('Podaj obie godziny (od i do)');
+            setSuccess('');
+            return;
+        }
+
         try {
             await updateMyPreferences(preferences);
-            setSuccess('Preferencje zapisane pomyślnie');
+            setSuccess('Godziny ciszy ustawione pomyślnie');
             setError('');
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
             console.error('Error saving preferences:', err);
             setError('Nie udało się zapisać preferencji');
+            setSuccess('');
+        }
+    };
+
+    const handleReset = async () => {
+        try {
+            await updateMyPreferences({
+                quiet_hours_start: null,
+                quiet_hours_end: null
+            });
+            setPreferences({
+                quiet_hours_start: '',
+                quiet_hours_end: ''
+            });
+            setSuccess('Godziny ciszy usunięte');
+            setError('');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+            console.error('Error resetting preferences:', err);
+            setError('Nie udało się zresetować preferencji');
             setSuccess('');
         }
     };
@@ -88,93 +109,87 @@ function NotificationPreferencesPage() {
                     Zarządzanie Powiadomieniami
                 </Typography>
 
-            {success && (
-                <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-                    {success}
-                </Alert>
-            )}
+                {success && (
+                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
+                        {success}
+                    </Alert>
+                )}
 
-            {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                    {error}
-                </Alert>
-            )}
+                {error && (
+                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                        {error}
+                    </Alert>
+                )}
 
-            <Paper sx={{ p: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                    Ogólne
-                </Typography>
-                <FormControlLabel
-                    control={
-                        <Switch
-                            checked={preferences.is_active}
-                            onChange={(e) => setPreferences({ ...preferences, is_active: e.target.checked })}
+                <Paper sx={{ p: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Godziny Ciszy (Quiet Hours)
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                        Ustaw godziny, w których nie chcesz otrzymywać powiadomień.
+                        Pozostaw puste, aby otrzymywać powiadomienia przez cały dzień.
+                    </Typography>
+
+                    <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+                        <TextField
+                            label="Od"
+                            type="time"
+                            value={preferences.quiet_hours_start}
+                            onChange={(e) => setPreferences({ ...preferences, quiet_hours_start: e.target.value })}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ step: 300 }}
+                            fullWidth
                         />
-                    }
-                    label="Włącz powiadomienia"
-                />
-                <Typography variant="body2" color="textSecondary" sx={{ ml: 4, mb: 3 }}>
-                    Wyłączenie spowoduje brak otrzymywania jakichkolwiek powiadomień
-                </Typography>
+                        <TextField
+                            label="Do"
+                            type="time"
+                            value={preferences.quiet_hours_end}
+                            onChange={(e) => setPreferences({ ...preferences, quiet_hours_end: e.target.value })}
+                            InputLabelProps={{ shrink: true }}
+                            inputProps={{ step: 300 }}
+                            fullWidth
+                        />
+                    </Box>
 
-                <Divider sx={{ my: 3 }} />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                        <Button
+                            variant="outlined"
+                            color="secondary"
+                            onClick={handleReset}
+                            disabled={loading || (!preferences.quiet_hours_start && !preferences.quiet_hours_end)}
+                        >
+                            Resetuj
+                        </Button>
+                        <Button
+                            variant="contained"
+                            startIcon={<SaveIcon />}
+                            onClick={handleSave}
+                            disabled={loading}
+                        >
+                            Zapisz
+                        </Button>
+                    </Box>
+                </Paper>
 
-                <Typography variant="h6" gutterBottom>
-                    Godziny Ciszy (Quiet Hours)
-                </Typography>
-                <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                    W wybranych godzinach nie będziesz otrzymywać powiadomień
-                </Typography>
-
-                <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-                    <TextField
-                        label="Od"
-                        type="time"
-                        value={preferences.quiet_hours_start}
-                        onChange={(e) => setPreferences({ ...preferences, quiet_hours_start: e.target.value })}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ step: 300 }}
-                        fullWidth
-                    />
-                    <TextField
-                        label="Do"
-                        type="time"
-                        value={preferences.quiet_hours_end}
-                        onChange={(e) => setPreferences({ ...preferences, quiet_hours_end: e.target.value })}
-                        InputLabelProps={{ shrink: true }}
-                        inputProps={{ step: 300 }}
-                        fullWidth
-                    />
-                </Box>
-
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                        variant="contained"
-                        startIcon={<SaveIcon />}
-                        onClick={handleSave}
-                        disabled={loading}
-                    >
-                        Zapisz
-                    </Button>
-                </Box>
-            </Paper>
-
-            <Paper sx={{ p: 3, mt: 3 }}>
-                <Typography variant="h6" gutterBottom>
-                    Informacje
-                </Typography>
-                <Typography variant="body2" color="textSecondary" paragraph>
-                    • Powiadomienia są wysyłane automatycznie przy tworzeniu nowych alertów
-                </Typography>
-                <Typography variant="body2" color="textSecondary" paragraph>
-                    • Otrzymasz powiadomienie gdy ktoś potwierdzi Twój alert
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                    • Administratorzy otrzymują wszystkie powiadomienia o potwierdzeniach
-                </Typography>
-            </Paper>
-        </Container>
-    </Box>
+                <Paper sx={{ p: 3, mt: 3 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Informacje
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" paragraph>
+                        • Powiadomienia są wysyłane automatycznie przy tworzeniu nowych alertów
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" paragraph>
+                        • W czasie Godzin Ciszy nie będziesz otrzymywać żadnych powiadomień
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary" paragraph>
+                        • Częstotliwość powiadomień zależy od ważności: CRITICAL (co 15 min), WARNING (co 60 min), INFO (co 24h)
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                        • Administratorzy otrzymują wszystkie powiadomienia CRITICAL
+                    </Typography>
+                </Paper>
+            </Container>
+        </Box>
     );
 }
 

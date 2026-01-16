@@ -17,7 +17,7 @@ def fill_alerts_from_csv():
         print("Alert table not empty — skipping.")
         return
 
-    alerts_to_create = []
+    alerts_created = 0
 
     with open(file_path, mode="r", encoding="utf-8") as csv_file:
         reader = csv.DictReader(csv_file)
@@ -27,7 +27,9 @@ def fill_alerts_from_csv():
                 if row.get("user_email"):
                     user = User.objects.filter(email=row["user_email"]).first()
 
-                alert_instance = Alert(
+                # Używamy create() zamiast bulk_create() żeby sygnały Django działały
+                # Sygnały automatycznie utworzą powiadomienia dla alertów NEW
+                Alert.objects.create(
                     user=user,
                     title=row["title"],
                     description=row["description"],
@@ -37,13 +39,12 @@ def fill_alerts_from_csv():
                     source=row["source"],
                     is_muted=row.get("is_muted", "false").lower() == "true",
                 )
-                alerts_to_create.append(alert_instance)
+                alerts_created += 1
             except Exception as e:
                 print(f"Error parsing row: {row}\n{e}")
 
-    if alerts_to_create:
-        Alert.objects.bulk_create(alerts_to_create)
-        print(f" Loaded {len(alerts_to_create)} alerts from {file_path}")
+    if alerts_created > 0:
+        print(f"✓ Loaded {alerts_created} alerts from {file_path}")
     else:
         print("No alerts created.")
 
